@@ -1,0 +1,23 @@
+-- Migration number: 0001 	 2024-02-02T12:00:00.000Z
+
+CREATE TABLE IF NOT EXISTS Users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    steam_id TEXT UNIQUE NOT NULL,
+    username TEXT NOT NULL,
+    avatar_url TEXT,
+    balance INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS Transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    type TEXT CHECK(type IN ('DEPOSIT', 'PURCHASE', 'WITHDRAWAL', 'REFUND')) NOT NULL,
+    status TEXT CHECK(status IN ('PENDING', 'COMPLETED', 'FAILED')) DEFAULT 'PENDING',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES Users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_steam_id ON Users(steam_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON Transactions(user_id);

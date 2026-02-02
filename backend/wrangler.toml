@@ -1,0 +1,17 @@
+name = "steamcanvas-backend"
+compatibility_date = "2024-02-08"
+main = "src/index.ts"
+
+# D1 Database Binding
+[[d1_databases]]
+binding = "STEAMCANVAS_DB"
+database_name = "STEAMCANVAS_DB"
+database_id = "e5767ee9-4437-412d-938e-cfd230ceafe0"
+
+# R2 Bucket Binding
+[[r2_buckets]]
+binding = "STEAMCANVAS_ASSETS"
+bucket_name = "steamcanvas-assets"
+
+[observability]
+enabled = true

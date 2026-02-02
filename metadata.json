@@ -1,0 +1,5 @@
+{
+  "name": "SteamCanvas",
+  "description": "A DeviantArt-inspired marketplace for Steam profile designs featuring a dual-currency economy.",
+  "requestFramePermissions": []
+}

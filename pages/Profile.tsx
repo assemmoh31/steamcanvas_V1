@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { User, Artwork } from '../types';
-import { 
-  MapPin, 
-  Calendar, 
-  Award, 
-  Edit, 
-  Settings as SettingsIcon, 
+import {
+  MapPin,
+  Calendar,
+  Award,
+  Edit,
+  Settings as SettingsIcon,
   Image as ImageIcon,
   Plus,
   LayoutGrid,
@@ -85,13 +85,14 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
   const [coverImage, setCoverImage] = useState('https://images.unsplash.com/photo-1614850523296-d8c1af93d400?q=80&w=2070&auto=format&fit=crop');
   const [pageBackground, setPageBackground] = useState<string | null>(null);
   const [selectedPrice, setSelectedPrice] = useState('any');
-  
+  const [showFilters, setShowFilters] = useState(false);
+
   const levelInfo = calculateCreatorLevel(user.totalSales);
 
   const [sections, setSections] = useState<ProfileSection[]>([
-    { 
-      id: 'sec-1', 
-      type: 'Gallery', 
+    {
+      id: 'sec-1',
+      type: 'Gallery',
       title: 'Featured Gallery',
       subtitle: 'Showcase your best works.'
     }
@@ -134,10 +135,10 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
     const newSection: SidebarSection = {
       id: `side-${Date.now()}`,
       type,
-      title: type === 'LevelProgress' ? 'Level Progress' : 
-             type === 'PostsFeed' ? 'Posts Feed' : 
-             type === 'PostSpotlight' ? 'Featured Post' : 
-             type === 'DonationPool' ? 'Donation Pool' : 'Custom Sidebar',
+      title: type === 'LevelProgress' ? 'Level Progress' :
+        type === 'PostsFeed' ? 'Posts Feed' :
+          type === 'PostSpotlight' ? 'Featured Post' :
+            type === 'DonationPool' ? 'Donation Pool' : 'Custom Sidebar',
       content: type === 'Custom' ? 'Extra details go here.' : '',
       goal: type === 'DonationPool' ? 10000 : undefined,
       current: type === 'DonationPool' ? 2450 : undefined
@@ -164,10 +165,10 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
 
   const ownedArtworks = artworks.filter(art => art.isOwned);
   // Filter artworks created by the current user for the Shop tab
-  const shopArtworks = artworks.filter(art => art.creatorId === user.id);
-  
+  const shopArtworks = artworks.filter(art => art.creatorId === user.steamId);
+
   const storagePercentage = user.storageUsed && user.storageLimit ? (user.storageUsed / user.storageLimit) * 100 : 0;
-  const uploadsUsed = artworks.filter(a => a.creatorId === user.id).length;
+  const uploadsUsed = artworks.filter(a => a.creatorId === user.steamId).length;
   const uploadLimit = 25;
   const uploadsRemaining = uploadLimit - uploadsUsed;
 
@@ -180,24 +181,24 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
 
   return (
     <div className="min-h-screen bg-[#060709] text-gray-200 font-sans selection:bg-white selection:text-black">
-      
+
       {/* 1. HEADER */}
       <div className="relative bg-[#1a1a1a] border-b border-white/5 pt-20 pb-16 min-h-[340px] flex items-end">
-        <div 
-          className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-1000" 
-          style={{ backgroundImage: `linear-gradient(to bottom, rgba(6,7,9,0.3), rgba(6,7,9,0.95)), url(${coverImage})` }} 
+        <div
+          className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-1000"
+          style={{ backgroundImage: `linear-gradient(to bottom, rgba(6,7,9,0.3), rgba(6,7,9,0.95)), url(${coverImage})` }}
         />
-        <div className="absolute inset-0 opacity-10 pointer-events-none z-1" 
-             style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
-        
+        <div className="absolute inset-0 opacity-10 pointer-events-none z-1"
+          style={{ backgroundImage: 'radial-gradient(#ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
+
         <div className="max-w-7xl mx-auto px-8 relative z-10 flex items-center justify-between w-full">
           <div className="flex items-center gap-8">
-            <CreatorAvatar 
-              src={user.avatarUrl} 
-              totalSales={user.totalSales} 
-              size="lg" 
+            <CreatorAvatar
+              src={user.avatarUrl}
+              totalSales={user.totalSales}
+              size="lg"
             />
-            
+
             <div className="flex flex-col">
               <div className="flex items-center gap-3 mb-3">
                 <h1 className="text-4xl font-black text-white tracking-tight drop-shadow-lg">{user.username}</h1>
@@ -212,16 +213,16 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
           </div>
 
           <div className="flex items-center gap-4">
-            <button 
-                onClick={() => setPage('moha31h')}
-                className="px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-red-500/20 backdrop-blur-md flex items-center gap-2"
-              >
-                <ShieldAlert size={14} /> Master Console
+            <button
+              onClick={() => setPage('moha31h')}
+              className="px-6 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-red-500/20 backdrop-blur-md flex items-center gap-2"
+            >
+              <ShieldAlert size={14} /> Master Console
             </button>
 
             {isEditMode ? (
               <div className="flex flex-col items-end gap-3">
-                <button 
+                <button
                   onClick={() => setCoverImage(`https://picsum.photos/seed/${Math.random()}/1920/600`)}
                   className="flex items-center gap-2 px-6 py-2.5 bg-black/60 hover:bg-black/80 text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-white/10 backdrop-blur-md"
                 >
@@ -230,7 +231,7 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                 </button>
                 <div className="flex gap-1.5 p-1.5 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
                   {themeColors.map(color => (
-                    <button 
+                    <button
                       key={color.value}
                       onClick={() => setAccentColor(color.value)}
                       className={`w-6 h-6 rounded-full border-2 transition-all ${accentColor === color.value ? 'border-white scale-110 shadow-lg' : 'border-transparent opacity-50 hover:opacity-100'}`}
@@ -240,7 +241,7 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                 </div>
               </div>
             ) : (
-              <button 
+              <button
                 onClick={() => setIsEditMode(true)}
                 className="px-8 py-3 bg-white/10 hover:bg-white/20 text-white rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-white/20 backdrop-blur-md"
               >
@@ -259,9 +260,8 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
               <button
                 key={tab}
                 onClick={() => handleTabClick(tab)}
-                className={`px-6 py-4 text-[11px] font-black uppercase tracking-[0.2em] transition-all relative ${
-                  activeTab === tab ? 'text-white' : 'text-gray-500 hover:text-white'
-                }`}
+                className={`px-6 py-4 text-[11px] font-black uppercase tracking-[0.2em] transition-all relative ${activeTab === tab ? 'text-white' : 'text-gray-500 hover:text-white'
+                  }`}
               >
                 <span className="flex items-center gap-2">
                   {tab === 'Stats' && <BarChart3 size={14} style={{ color: accentColor }} />}
@@ -270,16 +270,16 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                   {tab}
                 </span>
                 {activeTab === tab && (
-                  <motion.div 
-                    layoutId="nav-underline" 
-                    className="absolute bottom-0 left-0 right-0 h-1" 
-                    style={{ backgroundColor: accentColor }} 
+                  <motion.div
+                    layoutId="nav-underline"
+                    className="absolute bottom-0 left-0 right-0 h-1"
+                    style={{ backgroundColor: accentColor }}
                   />
                 )}
               </button>
             ))}
           </div>
-          
+
           <div className="flex items-center gap-8">
             <button className="flex items-center gap-2 text-[10px] font-black text-gray-500 hover:text-white transition-colors uppercase tracking-widest group">
               <SettingsIcon size={14} style={{ color: accentColor }} />
@@ -290,18 +290,18 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
       </div>
 
       {/* 3. DYNAMIC TAB CONTENT */}
-      <div 
+      <div
         className="relative min-h-[600px] transition-all duration-700"
-        style={{ 
+        style={{
           background: pageBackground ? `linear-gradient(rgba(6,7,9,0.9), rgba(6,7,9,0.95)), url(${pageBackground}) center/cover fixed` : '#060709'
         }}
       >
         <div className="max-w-7xl mx-auto px-8 py-16">
-          
+
           {/* STORAGE TAB */}
           {activeTab === 'Storage' && (
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-12">
-               <div className="flex items-center justify-between border-b border-white/5 pb-8">
+              <div className="flex items-center justify-between border-b border-white/5 pb-8">
                 <div className="space-y-1">
                   <h2 className="text-3xl font-black text-white tracking-tight flex items-center gap-3">
                     <HardDrive size={28} style={{ color: accentColor }} />
@@ -310,7 +310,7 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                   <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">Resource Allocation & Upload Quotas</p>
                 </div>
                 <button onClick={() => setPage('subscription')} className="px-6 py-2.5 bg-steam-blue/10 hover:bg-steam-blue text-steam-blue hover:text-black rounded-full text-[10px] font-black uppercase tracking-widest transition-all border border-steam-blue/20 flex items-center gap-2">
-                    <ArrowUpCircle size={14} /> Upgrade Quota
+                  <ArrowUpCircle size={14} /> Upgrade Quota
                 </button>
               </div>
 
@@ -322,8 +322,8 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                       <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest mt-1">Cloudflare R2 High-Performance Tier</p>
                     </div>
                     <div className="text-right">
-                       <span className="text-3xl font-black text-white">{storagePercentage.toFixed(1)}%</span>
-                       <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Utilized</p>
+                      <span className="text-3xl font-black text-white">{storagePercentage.toFixed(1)}%</span>
+                      <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Utilized</p>
                     </div>
                   </div>
                   <div className="relative pt-4">
@@ -344,8 +344,8 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                       <h3 className="text-sm font-black text-white uppercase tracking-widest">Upload Quota</h3>
                     </div>
                     <div className="flex items-baseline gap-2">
-                        <span className="text-5xl font-black text-white">{uploadsRemaining}</span>
-                        <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Slots left</span>
+                      <span className="text-5xl font-black text-white">{uploadsRemaining}</span>
+                      <span className="text-xs font-black text-gray-500 uppercase tracking-widest">Slots left</span>
                     </div>
                   </div>
                   <div className="space-y-4 pt-8">
@@ -354,14 +354,14 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                       <span className="text-white">{uploadsUsed} / {uploadLimit}</span>
                     </div>
                     <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                       <div className="h-full bg-steam-blue rounded-full" style={{ width: `${(uploadsUsed/uploadLimit)*100}%` }} />
+                      <div className="h-full bg-steam-blue rounded-full" style={{ width: `${(uploadsUsed / uploadLimit) * 100}%` }} />
                     </div>
                   </div>
                 </div>
               </div>
             </motion.div>
           )}
-          
+
           {/* HOME TAB */}
           {activeTab === 'Home' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
@@ -453,30 +453,30 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                     >
                       {isEditMode && (
                         <div className="absolute top-2 right-2 flex gap-1 z-50">
-                           <button onClick={() => moveSection(idx, 'up', true)} className="p-1.5 bg-black/60 rounded border border-white/10 text-white" disabled={idx === 0}><MoveUp size={12} /></button>
-                           <button onClick={() => moveSection(idx, 'down', true)} className="p-1.5 bg-black/60 rounded border border-white/10 text-white" disabled={idx === sidebarSections.length - 1}><MoveDown size={12} /></button>
-                           <button onClick={() => removeSection(section.id, true)} className="p-1.5 bg-red-500/20 rounded border border-red-500/30 text-red-500"><Trash2 size={12} /></button>
+                          <button onClick={() => moveSection(idx, 'up', true)} className="p-1.5 bg-black/60 rounded border border-white/10 text-white" disabled={idx === 0}><MoveUp size={12} /></button>
+                          <button onClick={() => moveSection(idx, 'down', true)} className="p-1.5 bg-black/60 rounded border border-white/10 text-white" disabled={idx === sidebarSections.length - 1}><MoveDown size={12} /></button>
+                          <button onClick={() => removeSection(section.id, true)} className="p-1.5 bg-red-500/20 rounded border border-red-500/30 text-red-500"><Trash2 size={12} /></button>
                         </div>
                       )}
-                      
+
                       <div className="p-6 space-y-4">
                         <h3 className="text-[10px] font-black text-white uppercase tracking-[0.2em] flex items-center gap-2">
-                           {section.type === 'LevelProgress' && <TrendingUp size={14} style={{ color: accentColor }} />}
-                           {section.type === 'PostsFeed' && <MessageSquare size={14} style={{ color: accentColor }} />}
-                           {section.type === 'PostSpotlight' && <Bookmark size={14} style={{ color: accentColor }} />}
-                           {section.type === 'DonationPool' && <Coins size={14} style={{ color: accentColor }} />}
-                           {section.type === 'Custom' && <Type size={14} style={{ color: accentColor }} />}
-                           {section.title}
+                          {section.type === 'LevelProgress' && <TrendingUp size={14} style={{ color: accentColor }} />}
+                          {section.type === 'PostsFeed' && <MessageSquare size={14} style={{ color: accentColor }} />}
+                          {section.type === 'PostSpotlight' && <Bookmark size={14} style={{ color: accentColor }} />}
+                          {section.type === 'DonationPool' && <Coins size={14} style={{ color: accentColor }} />}
+                          {section.type === 'Custom' && <Type size={14} style={{ color: accentColor }} />}
+                          {section.title}
                         </h3>
 
                         {section.type === 'LevelProgress' && (
                           <div className="space-y-4">
                             <div className="flex justify-between text-[10px] font-black text-gray-500 uppercase tracking-widest">
-                               <span>LEVEL {levelInfo.level}</span>
-                               <span>LEVEL {levelInfo.level + 1}</span>
+                              <span>LEVEL {levelInfo.level}</span>
+                              <span>LEVEL {levelInfo.level + 1}</span>
                             </div>
                             <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
-                               <motion.div initial={{ width: 0 }} animate={{ width: `${levelInfo.progressPercent}%` }} className="h-full" style={{ backgroundColor: accentColor }} />
+                              <motion.div initial={{ width: 0 }} animate={{ width: `${levelInfo.progressPercent}%` }} className="h-full" style={{ backgroundColor: accentColor }} />
                             </div>
                             <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest text-center">
                               {levelInfo.nextLevelXP ? `${(levelInfo.nextLevelXP - levelInfo.currentXP).toLocaleString()} AC to next tier` : 'MAX LEVEL ACHIEVED'}
@@ -486,32 +486,32 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
 
                         {section.type === 'PostsFeed' && (
                           <div className="space-y-3">
-                             {[1, 2, 3].map(i => (
-                               <div key={i} className="pb-3 border-b border-white/5 last:border-0 last:pb-0">
-                                  <p className="text-[11px] text-white font-bold leading-tight line-clamp-1">New Steam Canvas tools released!</p>
-                                  <span className="text-[8px] text-gray-600 font-black uppercase tracking-widest mt-1 block">OCT {i+10}, 2026</span>
-                               </div>
-                             ))}
+                            {[1, 2, 3].map(i => (
+                              <div key={i} className="pb-3 border-b border-white/5 last:border-0 last:pb-0">
+                                <p className="text-[11px] text-white font-bold leading-tight line-clamp-1">New Steam Canvas tools released!</p>
+                                <span className="text-[8px] text-gray-600 font-black uppercase tracking-widest mt-1 block">OCT {i + 10}, 2026</span>
+                              </div>
+                            ))}
                           </div>
                         )}
 
                         {section.type === 'PostSpotlight' && (
                           <div className="p-4 bg-white/5 rounded-lg border border-white/5">
-                             <h4 className="text-xs font-black text-steam-blue mb-2">Featured Journal</h4>
-                             <p className="text-[11px] text-gray-400 leading-relaxed italic">"My journey into minimalist design has been an amazing ride so far..."</p>
+                            <h4 className="text-xs font-black text-steam-blue mb-2">Featured Journal</h4>
+                            <p className="text-[11px] text-gray-400 leading-relaxed italic">"My journey into minimalist design has been an amazing ride so far..."</p>
                           </div>
                         )}
 
                         {section.type === 'DonationPool' && (
                           <div className="space-y-3">
-                             <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-                                <span className="text-gray-400">Goal: New GPU</span>
-                                <span style={{ color: accentColor }}>{section.current?.toLocaleString()} / {section.goal?.toLocaleString()} AC</span>
-                             </div>
-                             <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                <div className="h-full" style={{ width: `${(section.current! / section.goal!) * 100}%`, backgroundColor: accentColor }} />
-                             </div>
-                             <button className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-widest text-gray-300">Donate to Pool</button>
+                            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+                              <span className="text-gray-400">Goal: New GPU</span>
+                              <span style={{ color: accentColor }}>{section.current?.toLocaleString()} / {section.goal?.toLocaleString()} AC</span>
+                            </div>
+                            <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                              <div className="h-full" style={{ width: `${(section.current! / section.goal!) * 100}%`, backgroundColor: accentColor }} />
+                            </div>
+                            <button className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-[9px] font-black uppercase tracking-widest text-gray-300">Donate to Pool</button>
                           </div>
                         )}
 
@@ -567,44 +567,106 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
 
           {/* SHOP TAB */}
           {activeTab === 'Shop' && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-12">
-              <aside className="w-64 shrink-0 space-y-8 hidden xl:block">
-                <div className="space-y-6">
-                  <div className="flex items-center gap-2 text-white/40 mb-4">
-                    <Filter size={16} />
-                    <h3 className="text-xs font-black uppercase tracking-widest">Store Filters</h3>
-                  </div>
-                  <div className="space-y-4">
-                    {priceFilters.map((p) => (
-                      <label key={p.id} className="flex items-center gap-3 cursor-pointer group">
-                        <div className="relative flex items-center justify-center w-5 h-5">
-                          <input type="radio" name="shop-price" checked={selectedPrice === p.id} onChange={() => setSelectedPrice(p.id)} className="appearance-none w-5 h-5 rounded-full border-2 border-white/10 transition-all" />
-                          {selectedPrice === p.id && <div className="absolute w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+              {/* Filter Bar */}
+              <div className="flex items-center justify-between">
+                <div className="relative">
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${showFilters ? 'bg-white text-black border-white' : 'bg-white/5 text-gray-400 border-white/10 hover:border-white/20 hover:text-white'}`}
+                  >
+                    <Filter size={14} />
+                    Filters {selectedPrice !== 'any' && '(1)'}
+                  </button>
+
+                  {/* Filter Dropdown */}
+                  <AnimatePresence>
+                    {showFilters && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                        className="absolute top-12 left-0 w-64 bg-[#12141a] border border-white/10 rounded-2xl p-6 shadow-2xl z-50 backdrop-blur-3xl"
+                      >
+                        <div className="space-y-6">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-xs font-black text-white uppercase tracking-widest">Price Range</h3>
+                            <button onClick={() => setSelectedPrice('any')} className="text-[9px] text-gray-500 hover:text-white font-bold uppercase tracking-widest transition-colors">Reset</button>
+                          </div>
+                          <div className="space-y-3">
+                            {priceFilters.map((p) => (
+                              <label key={p.id} className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-white/5 rounded-lg transition-colors -mx-2">
+                                <div className="relative flex items-center justify-center w-4 h-4">
+                                  <input type="radio" name="shop-price" checked={selectedPrice === p.id} onChange={() => setSelectedPrice(p.id)} className="appearance-none w-4 h-4 rounded-full border-2 border-white/10 transition-all checked:border-0" />
+                                  {selectedPrice === p.id && <div className="absolute w-2 h-2 rounded-full" style={{ backgroundColor: accentColor }} />}
+                                </div>
+                                <span className={`text-[10px] font-bold tracking-widest uppercase transition-colors ${selectedPrice === p.id ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>{p.label}</span>
+                              </label>
+                            ))}
+                          </div>
                         </div>
-                        <span className={`text-[11px] font-bold tracking-widest uppercase transition-colors ${selectedPrice === p.id ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'}`}>{p.label}</span>
-                      </label>
-                    ))}
-                  </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </aside>
-              
-              <main className="flex-1 space-y-10">
+
+                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                  Showing {shopArtworks.length} Results
+                </div>
+              </div>
+
+              {/* Grid */}
+              <div className="min-h-[500px]">
                 {shopArtworks.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                     {shopArtworks.map((art) => (
-                      <motion.div key={art.id} whileHover={{ y: -5 }} className="bg-[#0b0c0f]/80 backdrop-blur-sm border border-white/5 rounded-md overflow-hidden group shadow-xl hover:border-white/10 transition-all">
-                        <div className="aspect-video bg-black relative">
-                          <img src={art.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                      <motion.div key={art.id} whileHover={{ y: -5 }} className="bg-[#0b0c0f]/80 backdrop-blur-sm border border-white/5 rounded-2xl overflow-hidden group shadow-xl hover:border-white/10 transition-all">
+                        <div
+                          className="aspect-video bg-black relative pointer-events-auto"
+                          onMouseEnter={(e) => {
+                            const vid = e.currentTarget.querySelector('video');
+                            if (vid) {
+                              vid.play().catch(e => console.log('Autoplay prevented', e));
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            const vid = e.currentTarget.querySelector('video');
+                            if (vid) {
+                              vid.pause();
+                              vid.currentTime = 0;
+                            }
+                          }}
+                        >
+                          {art.imageUrl?.endsWith('.webm') ? (
+                            <div className="w-full h-full relative">
+                              <video
+                                src={art.imageUrl}
+                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                muted
+                                loop
+                                playsInline
+                                preload="metadata"
+                                onLoadedMetadata={(e) => {
+                                  e.currentTarget.currentTime = 0;
+                                }}
+                              />
+                            </div>
+                          ) : (
+                            <img src={art.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={art.title} />
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                         </div>
-                        <div className="p-4 flex justify-between items-start">
+                        <div className="p-5 flex justify-between items-start">
                           <div className="min-w-0 pr-4">
-                            <h4 className="text-[13px] font-bold text-white truncate mb-1">{art.title}</h4>
-                            <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest">Steam Showcase Asset</p>
+                            <h4 className="text-sm font-bold text-white truncate mb-1.5">{art.title}</h4>
+                            <p className="text-[9px] text-gray-500 font-black uppercase tracking-widest flex items-center gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-steam-blue"></span> Showcase Asset
+                            </p>
                           </div>
                           <div className="text-right shrink-0">
-                             <div className="text-[13px] font-black tracking-tight text-yellow-500">
-                               {art.price || 0} <span className="text-[9px] opacity-70">AC</span>
-                             </div>
+                            <div className="text-sm font-black tracking-tight text-white/90 bg-white/5 px-3 py-1.5 rounded-lg border border-white/5 group-hover:border-white/10 transition-colors">
+                              {art.price || 0} <span className="text-[9px] opacity-50 ml-0.5">AC</span>
+                            </div>
                           </div>
                         </div>
                       </motion.div>
@@ -619,7 +681,7 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                       <h3 className="text-xl font-black text-white italic">Storefront Empty</h3>
                       <p className="text-gray-500 max-w-xs mx-auto text-sm leading-relaxed uppercase tracking-widest font-black text-[10px]">You haven't listed any designs for sale yet.</p>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setPage('upload')}
                       style={{ backgroundColor: accentColor }}
                       className="px-8 py-3 text-black font-black text-[10px] uppercase tracking-widest rounded-full shadow-xl hover:scale-105 transition-all"
@@ -628,7 +690,7 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                     </button>
                   </div>
                 )}
-              </main>
+              </div>
             </motion.div>
           )}
 
@@ -648,13 +710,17 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                   <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest">{ownedArtworks.length} Items Secured</span>
                 </div>
               </div>
-              
+
               {ownedArtworks.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-12">
                   {ownedArtworks.map((art) => (
                     <motion.div key={art.id} whileHover={{ y: -8 }} className="bg-[#0b0c0f]/80 backdrop-blur-sm border border-steam-blue/20 rounded-2xl overflow-hidden group shadow-2xl relative">
                       <div className="aspect-video bg-black relative overflow-hidden">
-                        <img src={art.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" />
+                        {art.imageUrl?.endsWith('.webm') ? (
+                          <video src={art.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" muted loop autoPlay playsInline />
+                        ) : (
+                          <img src={art.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" alt={art.title} />
+                        )}
                         <div className="absolute top-3 left-3"><span className="px-2.5 py-1 bg-steam-blue text-black text-[8px] font-black uppercase tracking-widest rounded-md shadow-lg">In Vault</span></div>
                       </div>
                       <div className="p-5">
@@ -689,8 +755,8 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
               <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest mt-1">Live Profile Tuning</span>
             </div>
             <div className="flex items-center gap-5">
-               <button onClick={() => setIsEditMode(false)} className="px-8 py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full transition-all hover:scale-105 active:scale-95 shadow-xl">Save Changes</button>
-               <button onClick={() => setIsEditMode(false)} className="px-8 py-3 bg-white/5 text-white text-[10px] font-black uppercase tracking-widest rounded-full border border-white/10 hover:bg-white/10 transition-all">Discard</button>
+              <button onClick={() => setIsEditMode(false)} className="px-8 py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full transition-all hover:scale-105 active:scale-95 shadow-xl">Save Changes</button>
+              <button onClick={() => setIsEditMode(false)} className="px-8 py-3 bg-white/5 text-white text-[10px] font-black uppercase tracking-widest rounded-full border border-white/10 hover:bg-white/10 transition-all">Discard</button>
             </div>
           </motion.div>
         )}

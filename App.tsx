@@ -15,6 +15,7 @@ import Tools from './pages/Tools';
 import ThemeFinder from './pages/ThemeFinder';
 import UploadArtwork from './pages/UploadArtwork';
 import AdminPanel from './pages/AdminPanel';
+import AdminInspection from './pages/AdminInspection';
 import Footer from './components/Footer';
 import HelpCenter from './pages/HelpCenter';
 import CustomGuide from './pages/CustomGuide';
@@ -25,7 +26,9 @@ import CookieSettings from './pages/CookieSettings';
 import RefundPolicy from './pages/RefundPolicy';
 import TransactionHistory from './pages/TransactionHistory';
 import { User, Artwork } from './types';
-import { getUser, getArtworks, buyArtwork } from './services/mockApi';
+import { getUser, getArtworks, buyArtwork, getInventory } from './services/mockApi';
+import AuthCallback from './pages/AuthCallback';
+import Gallery from './pages/Gallery';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -33,9 +36,42 @@ function App() {
   const [allArtworks, setAllArtworks] = useState<Artwork[]>([]);
   const [selectedArtworkId, setSelectedArtworkId] = useState<string | null>(null);
 
+  // Inside App component
   useEffect(() => {
-    getUser().then(data => setUser(data));
-    getArtworks().then(data => setAllArtworks(data));
+    // Check if we are on the auth callback route
+    if (window.location.pathname === '/auth/callback') {
+      setCurrentPage('auth-callback');
+    }
+
+    const fetchData = async () => {
+      try {
+        const [userData, artworksData] = await Promise.all([
+          getUser(),
+          getArtworks()
+        ]);
+
+        setUser(userData);
+
+        // If user is logged in, fetch inventory
+        let ownedIds: string[] = [];
+        if (userData) {
+          ownedIds = await getInventory();
+        }
+
+        // Merge ownership status
+        const mergedArtworks = artworksData.map(art => ({
+          ...art,
+          isOwned: ownedIds.includes(art.id)
+        }));
+
+        setAllArtworks(mergedArtworks);
+
+      } catch (error) {
+        console.error("Failed to load app data:", error);
+      }
+    };
+
+    fetchData();
   }, []);
 
   const refreshUser = () => {
@@ -43,17 +79,18 @@ function App() {
   };
 
   const handleLogin = () => {
-    alert("Redirecting to Steam OpenID...");
-    getUser().then(data => setUser(data));
+    // Redirect to Backend Steam Auth
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+    window.location.href = `${API_URL}/api/v1/auth/steam`;
   };
 
   const handleBuy = async (id: string) => {
-      const success = await buyArtwork(id);
-      if (success) {
-        alert("Artwork purchased! Adding to your collection.");
-        refreshUser();
-        setAllArtworks(prev => prev.map(a => a.id === id ? { ...a, isOwned: true } : a));
-      }
+    const success = await buyArtwork(id);
+    if (success) {
+      alert("Artwork purchased! Adding to your collection.");
+      refreshUser();
+      setAllArtworks(prev => prev.map(a => a.id === id ? { ...a, isOwned: true } : a));
+    }
   };
 
   const navigateToDetail = (id: string) => {
@@ -64,10 +101,12 @@ function App() {
 
   const renderPage = () => {
     switch (currentPage) {
+      case 'auth-callback':
+        return <AuthCallback setUser={setUser} setPage={setCurrentPage} />;
       case 'home':
         return <Home setPage={setCurrentPage} />;
       case 'marketplace':
-        return <Marketplace onSelectArtwork={navigateToDetail} />;
+        return <Marketplace onSelectArtwork={navigateToDetail} artworks={allArtworks} />;
       case 'theme-finder':
         return <ThemeFinder setPage={setCurrentPage} />;
       case 'tools':
@@ -111,16 +150,21 @@ function App() {
       case 'transaction-history':
         return <TransactionHistory setPage={setCurrentPage} />;
       case 'moha31h':
-        return <AdminPanel setPage={setCurrentPage} />;
+        return <AdminPanel setPage={setCurrentPage} onInspect={(id) => { setSelectedArtworkId(id); setCurrentPage('admin-inspect'); }} />;
+      case 'admin-inspect':
+        return <AdminInspection id={selectedArtworkId} setPage={setCurrentPage} />;
+      case 'gallery':
+        if (!user) return <div className="pt-32 text-center text-gray-400">Please login to view gallery.</div>;
+        return <Gallery user={user} setPage={setCurrentPage} />;
       case 'artwork-detail':
         const selectedArt = allArtworks.find(a => a.id === selectedArtworkId);
         if (!selectedArt) return <div className="pt-32 text-center text-gray-400">Artwork not found.</div>;
         const creatorOtherArt = allArtworks.filter(a => a.creatorId === selectedArt.creatorId);
         return (
-          <ArtworkDetail 
-            artwork={selectedArt} 
+          <ArtworkDetail
+            artwork={selectedArt}
             creatorArtworks={creatorOtherArt}
-            onBack={() => setCurrentPage('marketplace')} 
+            onBack={() => setCurrentPage('marketplace')}
             onBuy={handleBuy}
             onSelectArtwork={navigateToDetail}
           />
@@ -134,16 +178,16 @@ function App() {
 
   return (
     <div className="min-h-screen bg-steam-dark text-[#C5C6C7] font-sans selection:bg-steam-blue selection:text-black flex flex-col">
-      <Navbar 
-        user={user} 
-        currentPage={currentPage} 
-        setPage={setCurrentPage} 
-        onLogin={handleLogin} 
+      <Navbar
+        user={user}
+        currentPage={currentPage}
+        setPage={setCurrentPage}
+        onLogin={handleLogin}
       />
       <main className="fade-in flex-1">
         {renderPage()}
       </main>
-      
+
       {showFooter && <Footer setPage={setCurrentPage} />}
 
       <div className="fixed inset-0 pointer-events-none z-[-1] overflow-hidden">

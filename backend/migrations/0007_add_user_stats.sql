@@ -1,0 +1,3 @@
+-- Migration number: 0007 	 2026-02-04T10:35:00.000Z
+
+ALTER TABLE Users ADD COLUMN total_sales INTEGER DEFAULT 0;

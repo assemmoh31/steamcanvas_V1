@@ -1,0 +1,8 @@
+-- Migration number: 0004 	 2024-02-02T14:35:00.000Z
+
+ALTER TABLE Artworks ADD COLUMN source_key TEXT;
+ALTER TABLE Artworks ADD COLUMN preview_key TEXT;
+ALTER TABLE Artworks ADD COLUMN tags TEXT;
+ALTER TABLE Artworks ADD COLUMN dominant_colors TEXT;
+ALTER TABLE Artworks ADD COLUMN is_ai_generated BOOLEAN DEFAULT FALSE;
+ALTER TABLE Artworks ADD COLUMN author_type TEXT DEFAULT 'HUMAN';

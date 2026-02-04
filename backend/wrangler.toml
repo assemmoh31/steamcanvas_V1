@@ -12,6 +12,16 @@ database_id = "e5767ee9-4437-412d-938e-cfd230ceafe0"
 [[r2_buckets]]
 binding = "STEAMCANVAS_ASSETS"
 bucket_name = "steamcanvas-assets"
+preview_bucket_name = "steamcanvas-assets"
 
 [observability]
 enabled = true
+
+[vars]
+STEAM_API_KEY = "98FA30A44591DCD6073403FFC7CB68E4"
+JWT_SECRET = "SteamCanvas_Super_Secret_2026_!"
+FRONTEND_URL = "http://localhost:3000" # Change to production URL when deploying
+R2_ACCESS_KEY_ID = "20e4ce8be86b5e3900ff34ebd5148aa1"
+R2_SECRET_ACCESS_KEY = "3ed37e7b33ea4bd6e3cd5a1a74d18dce5a234066e7cce4206113f08e5122b014"
+R2_BUCKET_NAME = "steamcanvas-assets"
+R2_ACCOUNT_ID = "74026d70132b64d9df97869631855052"

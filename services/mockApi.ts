@@ -68,20 +68,20 @@ const MOCK_TRANSACTIONS: Transaction[] = [
 ];
 
 const MOCK_ARTWORKS: Artwork[] = [
-  { 
-    id: '1', 
-    title: 'Cyberpunk Glitch', 
+  {
+    id: '1',
+    title: 'Cyberpunk Glitch',
     description: 'A high-energy cyberpunk glitch animation designed for the Steam Artwork Showcase.',
-    creatorId: 'u2', 
-    creatorName: 'NeonDreamer', 
+    creatorId: 'u2',
+    creatorName: 'NeonDreamer',
     creatorStatus: 'Elite',
     creatorSales: 285000, // Level 5 Mythic
-    price: 500, 
-    imageUrl: 'https://picsum.photos/id/237/800/1000', 
-    tags: ['Cyberpunk', 'Glitch', 'Neon', 'Purple', 'Blue'], 
-    likes: 124, 
+    price: 500,
+    imageUrl: 'https://picsum.photos/id/237/800/1000',
+    tags: ['Cyberpunk', 'Glitch', 'Neon', 'Purple', 'Blue'],
+    likes: 124,
     sales: 450,
-    category: 'artwork', 
+    category: 'artwork',
     isOwned: true,
     resolution: '1920x1080',
     fileSize: '4.2 MB',
@@ -89,18 +89,18 @@ const MOCK_ARTWORKS: Artwork[] = [
     theme: 'Cyberpunk',
     colors: ['Purple', 'Blue']
   },
-  { 
-    id: '2', 
-    title: 'Forest Mist', 
+  {
+    id: '2',
+    title: 'Forest Mist',
     description: 'Calm, atmospheric forest scene with rolling fog.',
-    creatorId: 'u3', 
-    creatorName: 'NatureSoul', 
+    creatorId: 'u3',
+    creatorName: 'NatureSoul',
     creatorStatus: 'Creator',
     creatorSales: 3500, // Level 1 Bronze
-    price: 0, 
-    imageUrl: 'https://picsum.photos/id/10/800/600', 
-    tags: ['Nature', 'Atmospheric', 'Green', 'Gray'], 
-    likes: 89, 
+    price: 0,
+    imageUrl: 'https://picsum.photos/id/10/800/600',
+    tags: ['Nature', 'Atmospheric', 'Green', 'Gray'],
+    likes: 89,
     sales: 120,
     category: 'artwork',
     resolution: '1920x1080',
@@ -109,18 +109,18 @@ const MOCK_ARTWORKS: Artwork[] = [
     theme: 'Nature',
     colors: ['Green', 'Gray']
   },
-  { 
-    id: '3', 
-    title: 'Anime Aesthetic', 
+  {
+    id: '3',
+    title: 'Anime Aesthetic',
     description: 'Soft pink anime aesthetics featuring a cozy city view.',
-    creatorId: 'u1', 
-    creatorName: 'SteamDesigner_X', 
+    creatorId: 'u1',
+    creatorName: 'SteamDesigner_X',
     creatorStatus: 'Pro',
     creatorSales: 42000, // Level 2 Silver
-    price: 800, 
-    imageUrl: 'https://picsum.photos/id/45/800/800', 
-    tags: ['Anime', 'Pink', 'Soft', 'Blue'], 
-    likes: 256, 
+    price: 800,
+    imageUrl: 'https://picsum.photos/id/45/800/800',
+    tags: ['Anime', 'Pink', 'Soft', 'Blue'],
+    likes: 256,
     sales: 892,
     category: 'artwork',
     resolution: '1920x1080',
@@ -140,12 +140,75 @@ const MOCK_ARTWORKS: Artwork[] = [
   { id: 'w4', title: 'Matrix Rain Showcase', creatorId: 'u4', creatorName: 'PolyMaster', creatorStatus: 'Pro', creatorSales: 1200, price: 900, imageUrl: 'https://picsum.photos/id/201/600/340', tags: ['Matrix', 'Green', 'Animated'], likes: 445, sales: 881, category: 'workshop', theme: 'Abstract', colors: ['Green'] },
 ];
 
-export const getUser = async (): Promise<User> => {
-  return new Promise((resolve) => setTimeout(() => resolve({ ...MOCK_USER }), 500));
+export const getUser = async (): Promise<User | null> => {
+  const token = localStorage.getItem('token');
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${API_URL}/api/v1/user/profile`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+
+    if (!res.ok) {
+      if (res.status === 401) localStorage.removeItem('token');
+      return null;
+    }
+
+    const data = await res.json();
+    return {
+      id: data.id,
+      steamId: data.steamId,
+      username: data.username,
+      avatarUrl: data.avatarUrl,
+      purchaseCoins: data.purchaseCoins,
+      creatorCoins: data.creatorCoins,
+      totalSales: 0,
+      status: data.status,
+      storageUsed: 0,
+      storageLimit: 1.0
+    };
+  } catch (err) {
+    console.error('Failed to fetch user:', err);
+    return null;
+  }
 };
 
+// Use VITE_API_URL or default to localhost
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8787';
+
 export const getArtworks = async (): Promise<Artwork[]> => {
-  return new Promise((resolve) => setTimeout(() => resolve(MOCK_ARTWORKS), 600));
+  try {
+    const res = await fetch(`${API_URL}/api/v1/artworks`);
+    if (!res.ok) throw new Error('Failed to fetch artworks');
+
+    // Map D1 result to frontend Interface
+    // Note: D1 returns snake_case columns (preview_url), our generic type expects imageUrl
+    // We need to map it correctly.
+    const data = await res.json();
+
+    // If API returns { results: [...] } or just array, handle it
+    const list = Array.isArray(data) ? data : (data.results || []);
+
+    return list.map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      price: item.price,
+      imageUrl: item.preview_url, // map snake_case to camelCase
+      category: item.category || 'artwork',
+      creatorId: item.creator_id,
+      creatorName: item.creator_name || 'Unknown',
+      creatorStatus: 'Creator',
+      creatorAvatar: item.creator_avatar,
+      creatorSales: 0,
+      tags: [], // Tags need separate table later
+      likes: 0,
+      sales: 0,
+    }));
+  } catch (error) {
+    console.error('API Error (getArtworks):', error);
+    return []; // Return empty array on failure so UI doesn't crash
+  }
 };
 
 export const getTransactions = async (): Promise<Transaction[]> => {
@@ -153,18 +216,59 @@ export const getTransactions = async (): Promise<Transaction[]> => {
 };
 
 export const buyArtwork = async (artworkId: string): Promise<boolean> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            resolve(true);
-        }, 1000);
+  const token = localStorage.getItem('token');
+  if (!token) return false;
+
+  try {
+    const res = await fetch(`${API_URL}/api/v1/purchase`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ artworkId })
     });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      console.error('Purchase failed:', errorData);
+      alert(errorData.error || 'Purchase failed');
+      return false;
+    }
+
+    const data = await res.json();
+    return data.success;
+  } catch (err) {
+    console.error('Purchase error:', err);
+    return false;
+  }
 };
 
 export const addFunds = async (amount: number): Promise<boolean> => {
-    return new Promise((resolve) => {
-        setTimeout(() => {
-            MOCK_USER.purchaseCoins += amount;
-            resolve(true);
-        }, 1500);
+  // Placeholder: In real app, this would use Stripe
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      // We can't actually add funds via API yet without payment gateway
+      resolve(true);
+    }, 1500);
+  });
+};
+
+export const getInventory = async (): Promise<string[]> => {
+  const token = localStorage.getItem('token');
+  if (!token) return [];
+
+  try {
+    const res = await fetch(`${API_URL}/api/v1/user/inventory`, {
+      headers: { 'Authorization': `Bearer ${token}` }
     });
+
+    if (!res.ok) return [];
+
+    const data = await res.json();
+    return data.ownedIds || [];
+  } catch (err) {
+    console.error('Failed to fetch inventory:', err);
+    return [];
+  }
 };

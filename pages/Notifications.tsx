@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { 
-  Bell, 
-  ShoppingBag, 
-  Heart, 
-  UserPlus, 
-  Settings, 
-  Trash2, 
-  CheckCheck, 
+import {
+  Bell,
+  ShoppingBag,
+  Heart,
+  UserPlus,
+  Settings,
+  Trash2,
+  CheckCheck,
   MessageCircle,
   AlertCircle,
   ArrowLeft,
@@ -78,7 +78,34 @@ const MOCK_NOTIFICATIONS: Notification[] = [
 
 const Notifications: React.FC<NotificationsProps> = ({ user, setPage }) => {
   const [activeTab, setActiveTab] = useState<'all' | 'sales' | 'interactions' | 'system'>('all');
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchNotifications = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const res = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/v1/notifications`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setNotifications(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch notifications", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // Poll every 30s
+    const interval = setInterval(fetchNotifications, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const filteredNotifications = notifications.filter(n => {
     if (activeTab === 'all') return true;
@@ -88,12 +115,32 @@ const Notifications: React.FC<NotificationsProps> = ({ user, setPage }) => {
     return true;
   });
 
-  const markAllRead = () => {
+  const markAllRead = async () => {
+    // Optimistic update
     setNotifications(notifications.map(n => ({ ...n, isUnread: false })));
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/v1/notifications/read-all`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) {
+      console.error("Failed to mark all read", e);
+    }
   };
 
-  const clearAll = () => {
+  const clearAll = async () => {
+    if (!confirm('Are you sure you want to clear all notifications?')) return;
     setNotifications([]);
+    try {
+      const token = localStorage.getItem('token');
+      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8787'}/api/v1/notifications`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) {
+      console.error("Failed to clear notifications", e);
+    }
   };
 
   const getIcon = (type: NotificationType) => {
@@ -106,35 +153,50 @@ const Notifications: React.FC<NotificationsProps> = ({ user, setPage }) => {
     }
   };
 
+  // Helper to format date relative
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} mins ago`;
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    return `${diffDays} days ago`;
+  };
+
   return (
     <div className="min-h-screen pt-24 px-4 max-w-3xl mx-auto pb-20">
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
-            <button 
-                onClick={() => setPage('home')}
-                className="p-2 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors"
-            >
-                <ArrowLeft size={20} />
-            </button>
-            <h1 className="text-3xl font-bold text-white">Notifications</h1>
+          <button
+            onClick={() => setPage('home')}
+            className="p-2 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-3xl font-bold text-white">Notifications</h1>
         </div>
         <div className="flex gap-2">
-            <button 
-                onClick={markAllRead}
-                className="p-2 text-gray-400 hover:text-steam-blue hover:bg-steam-blue/5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
-                title="Mark all as read"
-            >
-                <CheckCheck size={18} />
-                <span className="hidden sm:inline">Mark Read</span>
-            </button>
-            <button 
-                onClick={clearAll}
-                className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
-                title="Clear all"
-            >
-                <Trash2 size={18} />
-                <span className="hidden sm:inline">Clear</span>
-            </button>
+          <button
+            onClick={markAllRead}
+            className="p-2 text-gray-400 hover:text-steam-blue hover:bg-steam-blue/5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
+            title="Mark all as read"
+          >
+            <CheckCheck size={18} />
+            <span className="hidden sm:inline">Mark Read</span>
+          </button>
+          <button
+            onClick={clearAll}
+            className="p-2 text-gray-400 hover:text-red-400 hover:bg-red-400/5 rounded-lg transition-all flex items-center gap-2 text-sm font-medium"
+            title="Clear all"
+          >
+            <Trash2 size={18} />
+            <span className="hidden sm:inline">Clear</span>
+          </button>
         </div>
       </div>
 
@@ -144,9 +206,8 @@ const Notifications: React.FC<NotificationsProps> = ({ user, setPage }) => {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-6 py-4 text-sm font-bold capitalize transition-all relative ${
-              activeTab === tab ? 'text-steam-blue' : 'text-gray-500 hover:text-gray-300'
-            }`}
+            className={`px-6 py-4 text-sm font-bold capitalize transition-all relative ${activeTab === tab ? 'text-steam-blue' : 'text-gray-500 hover:text-gray-300'
+              }`}
           >
             {tab}
             {activeTab === tab && (
@@ -166,22 +227,21 @@ const Notifications: React.FC<NotificationsProps> = ({ user, setPage }) => {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className={`p-4 rounded-xl border flex gap-4 items-start transition-all ${
-                  n.isUnread 
-                  ? 'bg-steam-blue/5 border-steam-blue/20' 
+                className={`p-4 rounded-xl border flex gap-4 items-start transition-all ${n.isUnread
+                  ? 'bg-steam-blue/5 border-steam-blue/20'
                   : 'bg-[#1c1e26] border-white/5 opacity-80 hover:opacity-100'
-                }`}
+                  }`}
               >
                 <div className={`p-2.5 rounded-lg bg-black/40 border border-white/5`}>
                   {getIcon(n.type)}
                 </div>
-                
+
                 <div className="flex-1">
                   <div className="flex justify-between items-start mb-1">
                     <h3 className={`font-bold text-sm ${n.isUnread ? 'text-white' : 'text-gray-300'}`}>{n.title}</h3>
                     <span className="text-[10px] text-gray-500 flex items-center gap-1">
                       <Clock size={10} />
-                      {n.time}
+                      {formatTime(n.time)}
                     </span>
                   </div>
                   <p className="text-sm text-gray-400 leading-relaxed">
@@ -200,13 +260,13 @@ const Notifications: React.FC<NotificationsProps> = ({ user, setPage }) => {
               </motion.div>
             ))
           ) : (
-            <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="py-20 text-center text-gray-500 flex flex-col items-center gap-4"
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="py-20 text-center text-gray-500 flex flex-col items-center gap-4"
             >
-                <Bell size={48} className="opacity-20" />
-                <p>No notifications found in this category.</p>
+              <Bell size={48} className="opacity-20" />
+              <p>No notifications found in this category.</p>
             </motion.div>
           )}
         </AnimatePresence>

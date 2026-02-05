@@ -6,6 +6,7 @@ import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { buildSteamAuthUrl, verifySteamAssertion, getSteamUserSummary } from './auth';
 import { authMiddleware } from './middleware/auth';
+import payments from './payments';
 
 type Bindings = {
     STEAMCANVAS_DB: D1Database;
@@ -16,7 +17,10 @@ type Bindings = {
     R2_ACCESS_KEY_ID: string;
     R2_SECRET_ACCESS_KEY: string;
     R2_BUCKET_NAME: string;
+
     R2_ACCOUNT_ID: string;
+    STRIPE_SECRET_KEY: string;
+    STRIPE_WEBHOOK_SECRET: string;
 };
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -91,6 +95,9 @@ app.get('/api/v1/artworks', async (c) => {
     }
 });
 
+// Payment Routes
+app.route('/api/v1/payments', payments);
+
 // ... (Auth routes remain the same) ...
 
 // --- ADMIN ROUTES ---
@@ -105,6 +112,17 @@ const adminCheck = async (c: any, next: any) => {
         return c.json({ error: 'Unauthorized: Admin access required' }, 403);
     }
     await next();
+};
+
+const createNotification = async (db: D1Database, userId: string, type: string, title: string, description: string, meta: string | null = null) => {
+    try {
+        await db.prepare(`
+            INSERT INTO Notifications (user_steam_id, type, title, description, meta_data) 
+            VALUES (?, ?, ?, ?, ?)
+        `).bind(userId, type, title, description, meta).run();
+    } catch (e) {
+        console.error('Failed to create notification', e);
+    }
 };
 
 // Admin: Get Pending Artworks
@@ -188,6 +206,8 @@ app.patch('/api/v1/admin/approve/:id', authMiddleware, adminCheck, async (c) => 
         const artwork = await c.env.STEAMCANVAS_DB.prepare('SELECT creator_id FROM Artworks WHERE id = ?').bind(artworkId).first();
         if (artwork) {
             await c.env.STEAMCANVAS_DB.prepare("UPDATE Users SET total_sales = total_sales + 50 WHERE steam_id = ?").bind(artwork.creator_id).run();
+            // Notify Creator
+            await createNotification(c.env.STEAMCANVAS_DB, artwork.creator_id as string, 'system', 'Artwork Approved', 'Your artwork has been approved and is now live on the marketplace.');
         }
         return c.json({ success: true, message: 'Artwork Approved' });
     } catch (error) {
@@ -213,9 +233,9 @@ app.patch('/api/v1/admin/reject/:id', authMiddleware, adminCheck, async (c) => {
         const artwork = await c.env.STEAMCANVAS_DB.prepare('SELECT creator_id FROM Artworks WHERE id = ?').bind(artworkId).first();
 
         // 2. Placeholder: Internal Notification Service
+        // 2. Notification
         if (artwork) {
-            console.log(`[Notification] Alerting User ${artwork.creator_id}: Your artwork was rejected. Reason: ${reason}`);
-            // Future: await NotificationService.send(artwork.creator_id, 'rejection', { reason });
+            await createNotification(c.env.STEAMCANVAS_DB, artwork.creator_id as string, 'system', 'Artwork Rejected', `Your artwork was rejected. Reason: ${reason}`);
         }
 
         // 3. Update DB
@@ -461,6 +481,91 @@ app.get('/api/v1/user/inventory', authMiddleware, async (c) => {
     }
 });
 
+// Protected Route: Get Transaction History
+app.get('/api/v1/user/transactions', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
+    try {
+        const { results } = await c.env.STEAMCANVAS_DB.prepare(`
+            SELECT * FROM Transactions 
+            WHERE user_id = (SELECT id FROM Users WHERE steam_id = ?) 
+            ORDER BY created_at DESC 
+            LIMIT 50
+        `).bind(user.sub).all();
+        return c.json(results);
+    } catch (error) {
+        console.error('Failed to fetch transactions:', error);
+        return c.json({ error: 'Failed to fetch transactions' }, 500);
+    }
+});
+
+// Protected Route: Get Notifications
+app.get('/api/v1/notifications', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
+    try {
+        const { results } = await c.env.STEAMCANVAS_DB.prepare(`
+            SELECT * FROM Notifications WHERE user_steam_id = ? ORDER BY created_at DESC LIMIT 50
+        `).bind(user.sub).all();
+
+        // Map DB fields to frontend expected format if needed, but simplistic mapping here
+        const notifications = results.map((n: any) => ({
+            id: n.id.toString(),
+            type: n.type,
+            title: n.title,
+            description: n.description,
+            time: n.created_at, // Frontend will format
+            isUnread: !n.is_read,
+            meta: n.meta_data
+        }));
+
+        return c.json(notifications);
+    } catch (error) {
+        return c.json({ error: 'Failed to fetch notifications' }, 500);
+    }
+});
+
+// Protected Route: Mark Notification Read
+app.put('/api/v1/notifications/:id/read', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
+    const id = c.req.param('id');
+    try {
+        // Verify ownership
+        const res = await c.env.STEAMCANVAS_DB.prepare("UPDATE Notifications SET is_read = 1 WHERE id = ? AND user_steam_id = ?").bind(id, user.sub).run();
+        return c.json({ success: true });
+    } catch (error) {
+        return c.json({ error: 'Failed' }, 500);
+    }
+});
+
+// Protected Route: Mark ALL Notifications Read
+app.put('/api/v1/notifications/read-all', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
+    try {
+        await c.env.STEAMCANVAS_DB.prepare("UPDATE Notifications SET is_read = 1 WHERE user_steam_id = ?").bind(user.sub).run();
+        return c.json({ success: true });
+    } catch (error) {
+        return c.json({ error: 'Failed' }, 500);
+    }
+});
+
+// Protected Route: Clear All Notifications
+app.delete('/api/v1/notifications', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
+    try {
+        await c.env.STEAMCANVAS_DB.prepare("DELETE FROM Notifications WHERE user_steam_id = ?").bind(user.sub).run();
+        return c.json({ success: true });
+    } catch (error) {
+        return c.json({ error: 'Failed' }, 500);
+    }
+});
+
+// Debug: Send Self Notification
+app.post('/api/v1/debug/notify', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
+    const { type, title, description, meta } = await c.req.json();
+    await createNotification(c.env.STEAMCANVAS_DB, user.sub, type, title, description, meta);
+    return c.json({ success: true });
+});
+
 // Protected Route: Purchase Artwork
 app.post('/api/v1/purchase', authMiddleware, async (c) => {
     const user = c.get('user') as any;
@@ -480,7 +585,7 @@ app.post('/api/v1/purchase', authMiddleware, async (c) => {
     }
 
     // 1. Fetch Buyer (Need internal Integer ID for Transactions table)
-    const buyer = await c.env.STEAMCANVAS_DB.prepare('SELECT id, balance FROM Users WHERE steam_id = ?').bind(buyerSteamId).first();
+    const buyer = await c.env.STEAMCANVAS_DB.prepare('SELECT id, balance, username FROM Users WHERE steam_id = ?').bind(buyerSteamId).first();
     if (!buyer) return c.json({ error: 'Buyer not found' }, 404);
 
     // 2. Fetch Artwork & Creator
@@ -526,7 +631,13 @@ app.post('/api/v1/purchase', authMiddleware, async (c) => {
             // Record Ownership (Inventory)
             c.env.STEAMCANVAS_DB.prepare(`
                 INSERT INTO Inventory (user_steam_id, artwork_id) VALUES (?, ?)
-            `).bind(buyerSteamId, artworkId)
+            `).bind(buyerSteamId, artworkId),
+
+            // Notify Creator
+            c.env.STEAMCANVAS_DB.prepare(`
+                INSERT INTO Notifications (user_steam_id, type, title, description, meta_data) 
+                VALUES (?, 'sale', 'Item Sold!', ?, ?)
+            `).bind(artwork.creator_id, `${buyer.username || 'Someone'} purchased your "${artwork.title}" artwork.`, `+${creatorShare} CC`)
         ];
 
         await c.env.STEAMCANVAS_DB.batch(batch);
@@ -679,6 +790,76 @@ app.get('/api/v1/artworks/search', async (c) => {
         return c.json(results);
     } catch (error) {
         return c.json({ error: 'Search failed' }, 500);
+    }
+});
+
+// --- REPORTING SYSTEM ---
+
+// Submit a Report
+app.post('/api/v1/reports', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
+    const { artworkId, reason, description } = await c.req.json();
+
+    if (!artworkId || !reason) {
+        return c.json({ error: 'Missing required fields' }, 400);
+    }
+
+    const reportId = `rep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    try {
+        // Ensure Table Exists (Auto-Migration for Dev)
+        await c.env.STEAMCANVAS_DB.prepare(`
+            CREATE TABLE IF NOT EXISTS Reports (
+                id TEXT PRIMARY KEY,
+                reporter_id TEXT NOT NULL,
+                artwork_id TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                description TEXT,
+                status TEXT DEFAULT 'PENDING',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `).run();
+
+        // Insert Report
+        await c.env.STEAMCANVAS_DB.prepare(`
+            INSERT INTO Reports (id, reporter_id, artwork_id, reason, description)
+            VALUES (?, ?, ?, ?, ?)
+        `).bind(reportId, user.sub, artworkId, reason, description).run();
+
+        return c.json({ success: true, reportId });
+    } catch (error: any) {
+        console.error('Report Error:', error);
+        return c.json({ error: 'Failed to submit report', details: error.message }, 500);
+    }
+});
+
+// Admin: Get All Reports
+app.get('/api/v1/admin/reports', authMiddleware, adminCheck, async (c) => {
+    try {
+        const { results } = await c.env.STEAMCANVAS_DB.prepare(`
+            SELECT 
+                Reports.*,
+                Reporter.username as reporter_name,
+                Reporter.avatar_url as reporter_avatar,
+                Artworks.title as artwork_title,
+                Artworks.preview_url as artwork_preview,
+                Creator.username as creator_name,
+                Creator.steam_id as creator_id
+            FROM Reports
+            LEFT JOIN Users as Reporter ON Reports.reporter_id = Reporter.steam_id
+            LEFT JOIN Artworks ON Reports.artwork_id = Artworks.id
+            LEFT JOIN Users as Creator ON Artworks.creator_id = Creator.steam_id
+            ORDER BY Reports.created_at DESC
+        `).all();
+
+        return c.json(results);
+    } catch (error) {
+        // If table doesn't exist yet, return empty list
+        if (String(error).includes('no such table')) {
+            return c.json([]);
+        }
+        console.error('Fetch Reports Error:', error);
+        return c.json({ error: 'Failed to fetch reports' }, 500);
     }
 });
 

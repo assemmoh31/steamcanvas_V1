@@ -36,6 +36,7 @@ export interface Artwork {
   fileType?: string;
   theme?: string;
   colors?: string[];
+  creatorAvatar?: string;
 }
 
 export enum TransactionType {

@@ -6,7 +6,7 @@ import Wallet from './pages/Wallet';
 import CreatorDashboard from './pages/CreatorDashboard';
 import Home from './pages/Home';
 import Profile from './pages/Profile';
-import CoinPurchase from './pages/CoinPurchase';
+import CoinShop from './pages/CoinShop';
 import Withdrawal from './pages/Withdrawal';
 import Notifications from './pages/Notifications';
 import ArtworkDetail from './pages/ArtworkDetail';
@@ -28,6 +28,7 @@ import TransactionHistory from './pages/TransactionHistory';
 import { User, Artwork } from './types';
 import { getUser, getArtworks, buyArtwork, getInventory } from './services/mockApi';
 import AuthCallback from './pages/AuthCallback';
+import PaymentSuccess from './pages/PaymentSuccess';
 import Gallery from './pages/Gallery';
 
 function App() {
@@ -41,6 +42,8 @@ function App() {
     // Check if we are on the auth callback route
     if (window.location.pathname === '/auth/callback') {
       setCurrentPage('auth-callback');
+    } else if (window.location.pathname === '/payment/success') {
+      setCurrentPage('payment-success');
     }
 
     const fetchData = async () => {
@@ -103,6 +106,8 @@ function App() {
     switch (currentPage) {
       case 'auth-callback':
         return <AuthCallback setUser={setUser} setPage={setCurrentPage} />;
+      case 'payment-success':
+        return <PaymentSuccess setPage={setCurrentPage} />;
       case 'home':
         return <Home setPage={setCurrentPage} />;
       case 'marketplace':
@@ -115,7 +120,7 @@ function App() {
         if (!user) return <div className="pt-32 text-center text-gray-400">Please login to view wallet.</div>;
         return <Wallet user={user} setPage={setCurrentPage} />;
       case 'purchase-coins':
-        return <CoinPurchase setPage={setCurrentPage} refreshUser={refreshUser} />;
+        return <CoinShop />;
       case 'withdrawal':
         if (!user) return <div className="pt-32 text-center text-gray-400">Please login to withdraw funds.</div>;
         return <Withdrawal user={user} setPage={setCurrentPage} />;
@@ -148,7 +153,7 @@ function App() {
       case 'refund-policy':
         return <RefundPolicy setPage={setCurrentPage} />;
       case 'transaction-history':
-        return <TransactionHistory setPage={setCurrentPage} />;
+        return <TransactionHistory setPage={setCurrentPage} onTransactionUpdate={refreshUser} />;
       case 'moha31h':
         return <AdminPanel setPage={setCurrentPage} onInspect={(id) => { setSelectedArtworkId(id); setCurrentPage('admin-inspect'); }} />;
       case 'admin-inspect':

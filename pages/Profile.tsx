@@ -641,7 +641,7 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                             <div className="w-full h-full relative">
                               <video
                                 src={art.imageUrl}
-                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                                className="w-full h-full object-cover"
                                 muted
                                 loop
                                 playsInline
@@ -652,9 +652,9 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                               />
                             </div>
                           ) : (
-                            <img src={art.imageUrl} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" alt={art.title} />
+                            <img src={art.imageUrl} className="w-full h-full object-cover" alt={art.title} />
                           )}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                          <div className="absolute inset-0 pointer-events-none" />
                         </div>
                         <div className="p-5 flex justify-between items-start">
                           <div className="min-w-0 pr-4">

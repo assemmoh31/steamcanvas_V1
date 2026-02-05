@@ -26,7 +26,8 @@ import {
   DollarSign,
   ChevronRight,
   Loader2,
-  Lock
+  Lock,
+  MessageSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -36,7 +37,7 @@ interface AdminPanelProps {
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
-  const [activeTab, setActiveTab] = useState<'moderation' | 'users' | 'financials' | 'content' | 'health'>('moderation');
+  const [activeTab, setActiveTab] = useState<'moderation' | 'users' | 'financials' | 'content' | 'health' | 'reports'>('moderation');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [hoveredArt, setHoveredArt] = useState<string | null>(null);
 
@@ -51,7 +52,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
 
     setLoading(true);
     try {
-      const API_URL = 'http://localhost:8787'; // In real app, use env var
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787'; // In real app, use env var
       const res = await fetch(`${API_URL}/api/v1/admin/pending`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -172,11 +173,33 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
     }
   };
 
+  // Reports State
+  const [reports, setReports] = useState<any[]>([]);
+  const [selectedReport, setSelectedReport] = useState<any | null>(null);
 
-  const reports = [
-    { id: 'r1', item: 'Stolen Asset V1', reporter: 'ArtistX', reason: 'Copyright Theft', status: 'pending' },
-    { id: 'r2', item: 'Explicit Image', reporter: 'User99', reason: 'Inappropriate Content', status: 'reviewed' },
-  ];
+  const fetchReports = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+      const res = await fetch(`${API_URL}/api/v1/admin/reports`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setReports(data || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch reports", err);
+    }
+  };
+
+  React.useEffect(() => {
+    if (activeTab === 'reports') {
+      fetchReports();
+    }
+  }, [activeTab]);
 
   const auditLogs = [
     { action: 'Approved Art #501', admin: 'Admin_Moha', time: '2m ago' },
@@ -201,6 +224,56 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
 
     return <video ref={videoRef} src={src} loop muted className="w-full h-full object-cover opacity-70 group-hover:opacity-100 transition-opacity" />;
   };
+
+  const renderReports = () => (
+    <div className="space-y-10 animate-in fade-in duration-500">
+      <section className="bg-[#12141a] rounded-3xl border border-white/5 overflow-hidden">
+        <div className="p-6 border-b border-white/5 flex items-center gap-2">
+          <AlertTriangle className="text-yellow-500" size={20} />
+          <h2 className="text-sm font-black text-white uppercase tracking-widest">Active Reports</h2>
+          <span className="ml-auto text-[10px] font-black text-yellow-500 bg-yellow-500/10 px-3 py-1 rounded-full uppercase tracking-widest border border-yellow-500/20">
+            {reports.length} Open Cases
+          </span>
+        </div>
+        <div className="divide-y divide-white/5">
+          {reports.map(report => (
+            <div
+              key={report.id}
+              className="p-6 flex items-center justify-between group hover:bg-white/[0.02] transition-colors cursor-pointer"
+              onClick={() => setSelectedReport(report)}
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
+                  <AlertTriangle size={24} />
+                </div>
+                <div>
+                  <h4 className="text-white font-bold text-sm mb-1">{report.artwork_title || 'Unknown Asset'}</h4>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500 font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">Reporter: {report.reporter_name || 'Anonymous'}</span>
+                    <span className="text-[10px] text-red-400 font-bold uppercase tracking-widest bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">{report.reason}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border ${report.status === 'PENDING' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' : 'bg-green-500/10 text-green-500 border-green-500/20'}`}>
+                  {report.status}
+                </span>
+                <button className="p-3 bg-white/5 hover:bg-white/10 rounded-xl text-gray-500 hover:text-white transition-colors border border-white/5">
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            </div>
+          ))}
+          {reports.length === 0 && (
+            <div className="p-12 text-center text-gray-500">
+              <Check size={48} className="mx-auto mb-4 opacity-20" />
+              <p className="text-sm font-bold uppercase tracking-widest">No Active Reports</p>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
 
   const renderModeration = () => (
     <div className="space-y-10 animate-in fade-in duration-500">
@@ -302,34 +375,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
             ))}
           </div>
         )}
-      </section>
-
-      <section className="bg-[#12141a] rounded-3xl border border-white/5 overflow-hidden">
-        <div className="p-6 border-b border-white/5 flex items-center gap-2">
-          <AlertTriangle className="text-yellow-500" size={20} />
-          <h2 className="text-sm font-black text-white uppercase tracking-widest">Recent Reports</h2>
-        </div>
-        <div className="divide-y divide-white/5">
-          {reports.map(report => (
-            <div key={report.id} className="p-5 flex items-center justify-between group hover:bg-white/[0.02] transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
-                  <AlertTriangle size={18} />
-                </div>
-                <div>
-                  <h4 className="text-white font-bold text-xs">{report.item}</h4>
-                  <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5">Reported by {report.reporter} • {report.reason}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${report.status === 'pending' ? 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20' : 'bg-green-500/10 text-green-500 border-green-500/20'}`}>
-                  {report.status}
-                </span>
-                <button className="p-2 text-gray-500 hover:text-white transition-colors"><ChevronRight size={18} /></button>
-              </div>
-            </div>
-          ))}
-        </div>
       </section>
     </div>
   );
@@ -647,6 +692,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
           <nav className="hidden lg:flex items-center gap-2">
             {[
               { id: 'moderation', label: 'Queue', icon: <ShieldAlert size={14} /> },
+              { id: 'reports', label: 'Reports', icon: <MessageSquare size={14} /> },
               { id: 'users', label: 'Users', icon: <Users size={14} /> },
               { id: 'financials', label: 'Engine', icon: <DollarSign size={14} /> },
               { id: 'content', label: 'Market', icon: <Layout size={14} /> },
@@ -681,6 +727,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
       <div className="flex-1 p-8 lg:p-12 max-w-[1600px] mx-auto w-full">
         <AnimatePresence mode="wait">
           {activeTab === 'moderation' && renderModeration()}
+          {activeTab === 'reports' && renderReports()}
           {activeTab === 'users' && renderUsers()}
           {activeTab === 'financials' && renderFinancials()}
           {activeTab === 'content' && renderContent()}
@@ -785,6 +832,70 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
                 </button>
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {selectedReport && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+            onClick={() => setSelectedReport(null)}
+          >
+            <div className="bg-[#1c1e26] border border-white/10 rounded-3xl p-8 max-w-2xl w-full shadow-2xl relative" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setSelectedReport(null)} className="absolute top-6 right-6 text-gray-500 hover:text-white"><X size={20} /></button>
+
+              <h2 className="text-xl font-black text-white uppercase tracking-widest mb-6 flex items-center gap-2">
+                <ShieldAlert className="text-red-500" /> Report Details
+              </h2>
+
+              <div className="grid grid-cols-2 gap-8 mb-8">
+                <div>
+                  <h3 className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-2">Reporter</h3>
+                  <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                    <img src={selectedReport.reporter_avatar || 'https://via.placeholder.com/40'} className="w-8 h-8 rounded-full" />
+                    <span className="text-sm font-bold text-white">{selectedReport.reporter_name}</span>
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-2">Reported Creator</h3>
+                  <div className="flex items-center gap-3 p-3 bg-white/5 rounded-xl">
+                    <span className="text-sm font-bold text-white">{selectedReport.creator_name || 'Unknown'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h3 className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-2">Reason & Description</h3>
+                <div className="p-4 bg-red-500/5 border border-red-500/10 rounded-xl space-y-2">
+                  <span className="inline-block px-2 py-1 bg-red-500/20 text-red-400 text-[10px] font-black uppercase tracking-widest rounded">{selectedReport.reason}</span>
+                  <p className="text-sm text-gray-300">{selectedReport.description || "No description provided."}</p>
+                </div>
+              </div>
+
+              <div className="mb-8">
+                <h3 className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-2">Target Asset</h3>
+                <div className="flex gap-4 p-4 bg-black/40 border border-white/5 rounded-xl">
+                  <img src={selectedReport.artwork_preview} className="w-24 h-16 object-cover rounded-lg bg-gray-800" />
+                  <div>
+                    <h4 className="text-white font-bold">{selectedReport.artwork_title}</h4>
+                    <button
+                      onClick={() => onInspect && onInspect(selectedReport.artwork_id)}
+                      className="text-steam-blue text-xs font-bold hover:underline mt-1 flex items-center gap-1"
+                    >
+                      View Full Artwork <ExternalLink size={12} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setSelectedReport(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 font-black text-xs uppercase tracking-widest">Close</button>
+                <button className="flex-1 py-3 bg-red-500 hover:bg-red-600 rounded-xl text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-red-500/20">Take Action</button>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -17,7 +17,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) 
     <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-black/40 border-b border-white/5 transition-all duration-300">
       <div className="px-4 sm:px-8">
         <div className="flex items-center justify-between h-20">
-          
+
           {/* Left Side: Logo + Nav Links anchored to the left */}
           <div className="flex items-center gap-10">
             {/* Logo */}
@@ -28,35 +28,35 @@ const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) 
 
             {/* Desktop Nav */}
             <div className="hidden md:flex items-center space-x-6">
-              <button 
-                  onClick={() => setPage('marketplace')}
-                  className={`${currentPage === 'marketplace' ? 'text-white border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest`}
+              <button
+                onClick={() => setPage('marketplace')}
+                className={`${currentPage === 'marketplace' ? 'text-white border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest`}
               >
                 Marketplace
               </button>
-              <button 
-                  onClick={() => setPage('theme-finder')}
-                  className={`${currentPage === 'theme-finder' ? 'text-white border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5`}
+              <button
+                onClick={() => setPage('theme-finder')}
+                className={`${currentPage === 'theme-finder' ? 'text-white border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5`}
               >
                 Themes
               </button>
-              <button 
-                  onClick={() => setPage('tools')}
-                  className={`${currentPage === 'tools' ? 'text-white border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5`}
+              <button
+                onClick={() => setPage('tools')}
+                className={`${currentPage === 'tools' ? 'text-white border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5`}
               >
                 Tools
               </button>
-              
-              <button 
-                  onClick={() => setPage('dashboard')}
-                  className={`${currentPage === 'dashboard' ? 'text-white border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest`}
+
+              <button
+                onClick={() => setPage('dashboard')}
+                className={`${currentPage === 'dashboard' ? 'text-white border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest`}
               >
                 Creator Studio
               </button>
 
-              <button 
-                  onClick={() => setPage('subscription')}
-                  className={`${currentPage === 'subscription' ? 'text-steam-blue border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5`}
+              <button
+                onClick={() => setPage('subscription')}
+                className={`${currentPage === 'subscription' ? 'text-steam-blue border-b-2 border-steam-blue' : 'text-gray-400'} hover:text-steam-blue transition-all pb-1 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5`}
               >
                 <Star size={12} fill={currentPage === 'subscription' ? "currentColor" : "none"} />
                 Pricing
@@ -71,7 +71,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) 
                 {/* User Status Group (Shifted Left) */}
                 <div className="flex items-center gap-6 pr-4 border-r border-white/10">
                   {/* Notifications Icon */}
-                  <button 
+                  <button
                     onClick={() => setPage('notifications')}
                     className={`relative p-2 rounded-full transition-all group ${currentPage === 'notifications' ? 'text-steam-blue bg-steam-blue/10' : 'text-gray-400 hover:text-white hover:bg-white/5'}`}
                   >
@@ -80,33 +80,33 @@ const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) 
                   </button>
 
                   {/* Wallet Pill */}
-                  <div 
-                      onClick={() => setPage('purchase-coins')}
-                      className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer group"
+                  <div
+                    onClick={() => setPage('wallet')}
+                    className="flex items-center gap-3 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all cursor-pointer group"
                   >
-                      <div className="flex flex-col items-end leading-none">
-                          <span className="text-[10px] text-gray-400 uppercase tracking-wider">Balance</span>
-                          <span className="text-sm font-bold text-yellow-400 group-hover:text-yellow-300 transition-colors">{user.purchaseCoins.toLocaleString()} <span className="text-xs">AC</span></span>
-                      </div>
-                      <div className="w-px h-6 bg-white/10 mx-1"></div>
-                      <div className="flex flex-col items-start leading-none">
-                          <span className="text-[10px] text-gray-400 uppercase tracking-wider">Earnings</span>
-                          <span className="text-sm font-bold text-creator-base group-hover:text-blue-400 transition-colors">{user.creatorCoins.toLocaleString()} <span className="text-xs">CC</span></span>
-                      </div>
-                      <Wallet className="w-5 h-5 text-gray-400 ml-1 group-hover:text-white" />
+                    <div className="flex flex-col items-end leading-none">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wider">Balance</span>
+                      <span className="text-sm font-bold text-yellow-400 group-hover:text-yellow-300 transition-colors">{user.purchaseCoins.toLocaleString()} <span className="text-xs">AC</span></span>
+                    </div>
+                    <div className="w-px h-6 bg-white/10 mx-1"></div>
+                    <div className="flex flex-col items-start leading-none">
+                      <span className="text-[10px] text-gray-400 uppercase tracking-wider">Earnings</span>
+                      <span className="text-sm font-bold text-creator-base group-hover:text-blue-400 transition-colors">{user.creatorCoins.toLocaleString()} <span className="text-xs">CC</span></span>
+                    </div>
+                    <Wallet className="w-5 h-5 text-gray-400 ml-1 group-hover:text-white" />
                   </div>
-                  
+
                   {/* Avatar */}
-                  <div 
-                      onClick={() => setPage('profile')}
-                      className="w-8 h-8 rounded-full overflow-hidden border border-white/20 cursor-pointer hover:border-steam-blue transition-colors shrink-0"
+                  <div
+                    onClick={() => setPage('profile')}
+                    className="w-8 h-8 rounded-full overflow-hidden border border-white/20 cursor-pointer hover:border-steam-blue transition-colors shrink-0"
                   >
-                      <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
+                    <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
                   </div>
                 </div>
 
                 {/* Upload Button */}
-                <button 
+                <button
                   onClick={() => setPage('upload')}
                   className="flex items-center gap-2 bg-steam-blue/10 hover:bg-steam-blue/20 text-steam-blue px-4 py-1.5 rounded-full border border-steam-blue/30 text-sm font-bold transition-all hover:shadow-[0_0_15px_rgba(102,252,241,0.2)] group"
                 >
@@ -115,7 +115,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) 
                 </button>
               </>
             ) : (
-              <button 
+              <button
                 onClick={onLogin}
                 className="flex items-center gap-2 bg-[#171a21] hover:bg-[#2a475e] text-[#c5c3c0] px-4 py-2 rounded font-bold transition-colors duration-200 border border-transparent hover:border-[#66c0f4]"
               >
@@ -136,7 +136,7 @@ const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) 
       {/* Mobile Menu */}
       <AnimatePresence>
         {isMenuOpen && (
-          <motion.div 
+          <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -150,14 +150,14 @@ const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) 
               <button onClick={() => { setPage('subscription'); setIsMenuOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-steam-blue hover:bg-white/10 w-full text-left">Upgrade Plan</button>
               <button onClick={() => { setPage('upload'); setIsMenuOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-white/10 w-full text-left">Upload Design</button>
               <button onClick={() => { setPage('profile'); setIsMenuOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-white/10 w-full text-left">My Profile</button>
-              
+
               {/* ADMIN SHORTCUT */}
               <button onClick={() => { setPage('moha31h'); setIsMenuOpen(false); }} className="flex items-center gap-2 px-3 py-2 rounded-md text-base font-black text-red-500 hover:bg-red-500/10 w-full text-left">
                 <ShieldAlert size={18} /> Admin Console
               </button>
 
               {!user && (
-                 <button onClick={onLogin} className="block w-full mt-4 bg-steam-blue text-steam-dark font-bold py-2 rounded text-center">Login With Steam</button>
+                <button onClick={onLogin} className="block w-full mt-4 bg-steam-blue text-steam-dark font-bold py-2 rounded text-center">Login With Steam</button>
               )}
             </div>
           </motion.div>

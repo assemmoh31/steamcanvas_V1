@@ -131,6 +131,7 @@ const UploadArtwork: React.FC<UploadArtworkProps> = ({ setPage }) => {
   const [description, setDescription] = useState('');
   const [price, setPrice] = useState('250');
   const [isFree, setIsFree] = useState(false);
+  const [uploadType, setUploadType] = useState<'artwork' | 'workshop'>('artwork');
 
   // Tag Management States
   const [tags, setTags] = useState<string[]>([]);
@@ -347,7 +348,13 @@ const UploadArtwork: React.FC<UploadArtworkProps> = ({ setPage }) => {
         })
       });
 
-      if (!intentRes.ok) throw new Error('Failed to initiate upload');
+      if (!intentRes.ok) {
+        const errorData = await intentRes.json();
+        if (intentRes.status === 403 && errorData.code === 'STORAGE_LIMIT_EXCEEDED') {
+          throw new Error(`STORAGE_LIMIT: ${errorData.error}`);
+        }
+        throw new Error(errorData.error || 'Failed to initiate upload');
+      }
       const { preview, source } = await intentRes.json();
 
       setUploadStatus('uploading');
@@ -389,9 +396,10 @@ const UploadArtwork: React.FC<UploadArtworkProps> = ({ setPage }) => {
           tags,
           dominantColors: selectedColors,
           isAiGenerated: isAI,
-          category: 'artwork',
+          category: uploadType,
           previewKey: preview.key,
-          sourceKey: source.key
+          sourceKey: source.key,
+          fileSize: (previewFile?.size || 0) + (sourceFile?.size || 0)
         })
       });
 
@@ -405,10 +413,18 @@ const UploadArtwork: React.FC<UploadArtworkProps> = ({ setPage }) => {
         setPage('dashboard');
       }, 1000);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Upload Failed:', error);
       setUploadStatus('error');
-      alert(`Upload Failed: ${error}`);
+
+      const msg = error.message || String(error);
+
+      if (msg.includes('STORAGE_LIMIT')) {
+        alert("⚠️ Storage Limit Reached!\n\nYou have exceeded your 30MB storage quota.\n\nPlease upgrade your plan to continue uploading.");
+      } else {
+        alert(`Upload Failed: ${msg}`);
+      }
+
       setIsUploading(false);
     }
   };
@@ -610,6 +626,30 @@ const UploadArtwork: React.FC<UploadArtworkProps> = ({ setPage }) => {
                   placeholder="Tell the community about your creation..."
                   className="w-full bg-white/5 border border-white/5 rounded-xl px-5 py-4 text-sm text-white focus:outline-none focus:border-steam-blue/30 transition-all min-h-[120px] resize-none"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">Asset Category</label>
+                <div className="grid grid-cols-2 gap-2 bg-white/5 p-1 rounded-xl">
+                  <button
+                    onClick={() => setUploadType('artwork')}
+                    className={`py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${uploadType === 'artwork'
+                      ? 'bg-steam-blue text-black shadow-lg shadow-steam-blue/20'
+                      : 'text-gray-500 hover:text-white hover:bg-white/5'
+                      }`}
+                  >
+                    <ImageIcon size={14} /> Artwork
+                  </button>
+                  <button
+                    onClick={() => setUploadType('workshop')}
+                    className={`py-3 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all flex items-center justify-center gap-2 ${uploadType === 'workshop'
+                      ? 'bg-steam-blue text-black shadow-lg shadow-steam-blue/20'
+                      : 'text-gray-500 hover:text-white hover:bg-white/5'
+                      }`}
+                  >
+                    <HardDrive size={14} /> Workshop
+                  </button>
+                </div>
               </div>
             </div>
           </section>

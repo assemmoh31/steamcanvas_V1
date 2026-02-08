@@ -50,6 +50,7 @@ import CreatorTag from '../components/CreatorTag';
 import CreatorAvatar from '../components/CreatorAvatar';
 import StorageStatus from '../components/StorageStatus';
 import { calculateCreatorLevel } from '../utils/leveling';
+import PlanBadge from '../components/PlanBadge';
 
 interface ProfileProps {
   user: User;
@@ -200,11 +201,15 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
             />
 
             <div className="flex flex-col">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="flex items-center">
                 <h1 className="text-4xl font-black text-white tracking-tight drop-shadow-lg">{user.username}</h1>
-                <CreatorTag status={user.status} className="h-4 scale-125 origin-left" />
+                <div className="ml-4 flex items-center gap-2">
+                  <PlanBadge tier={user.plan_tier} className="scale-110" />
+                  {/* If user is also a creator, show that badge too */}
+                  {user.status === 'Creator' && <PlanBadge tier="CREATOR" />}
+                </div>
               </div>
-              <div className="flex items-center gap-4 text-[10px] text-gray-300 font-bold uppercase tracking-widest">
+              <div className="flex items-center gap-4 text-[10px] text-gray-300 font-bold uppercase tracking-widest mt-2">
                 <span>0 Followers</span>
                 <span className="opacity-20">|</span>
                 <span>1 Page View</span>
@@ -332,7 +337,7 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
                     </div>
                     <div className="flex justify-between mt-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">
                       <span>{user.storageUsed?.toFixed(2)} GB Used</span>
-                      <span>{user.storageLimit?.toFixed(1)} GB Total Capacity</span>
+                      <span>{user.storageLimit?.toFixed(2)} GB Total Capacity</span>
                     </div>
                   </div>
                 </div>

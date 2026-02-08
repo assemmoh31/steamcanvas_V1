@@ -12,7 +12,9 @@ import {
     Clock,
     AlertTriangle,
     FileCheck,
-    XCircle
+    XCircle,
+    HardDrive,
+    Image as ImageIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -206,6 +208,13 @@ const AdminInspection: React.FC<AdminInspectionProps> = ({ id, setPage }) => {
                             <div className="bg-white/5 px-4 py-2 rounded-xl border border-white/10">
                                 <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest block">Creator ID</span>
                                 <span className="text-xs font-mono text-gray-300">{data.creator_id.substring(0, 12)}...</span>
+                            </div>
+                            <div className="bg-purple-500/10 px-4 py-2 rounded-xl border border-purple-500/20">
+                                <span className="text-[10px] text-purple-400 font-black uppercase tracking-widest block">Category</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                    {data.category === 'workshop' ? <HardDrive size={14} className="text-purple-400" /> : <ImageIcon size={14} className="text-purple-400" />}
+                                    <span className="text-xs font-black text-white uppercase">{data.category || 'Artwork'}</span>
+                                </div>
                             </div>
                         </div>
                     </section>

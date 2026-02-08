@@ -164,8 +164,9 @@ export const getUser = async (): Promise<User | null> => {
       creatorCoins: data.creatorCoins,
       totalSales: 0,
       status: data.status,
-      storageUsed: 0,
-      storageLimit: 1.0
+      plan_tier: data.plan_tier, // Correctly mapped from API
+      storageUsed: data.storageUsed || 0,
+      storageLimit: data.storageLimit || 1.0
     };
   } catch (err) {
     console.error('Failed to fetch user:', err);
@@ -201,7 +202,8 @@ export const getArtworks = async (): Promise<Artwork[]> => {
       creatorStatus: 'Creator',
       creatorAvatar: item.creator_avatar,
       creatorSales: 0,
-      tags: [], // Tags need separate table later
+      tags: item.tags ? (typeof item.tags === 'string' ? JSON.parse(item.tags) : item.tags) : [],
+      dominant_colors: item.dominant_colors,
       likes: 0,
       sales: 0,
     }));

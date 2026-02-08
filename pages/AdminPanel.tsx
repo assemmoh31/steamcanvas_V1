@@ -36,8 +36,10 @@ interface AdminPanelProps {
   onInspect?: (id: string) => void;
 }
 
+import AdsManagement from './Admin/AdsManagement';
+
 const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
-  const [activeTab, setActiveTab] = useState<'moderation' | 'users' | 'financials' | 'content' | 'health' | 'reports'>('moderation');
+  const [activeTab, setActiveTab] = useState<'moderation' | 'users' | 'financials' | 'content' | 'health' | 'reports' | 'ads'>('moderation');
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [hoveredArt, setHoveredArt] = useState<string | null>(null);
 
@@ -176,6 +178,40 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
   // Reports State
   const [reports, setReports] = useState<any[]>([]);
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
+  const [replyMessage, setReplyMessage] = useState('');
+  const [isReplying, setIsReplying] = useState(false);
+
+  const handleReply = async () => {
+    if (!selectedReport || !replyMessage) return;
+
+    setIsReplying(true);
+    try {
+      const token = localStorage.getItem('token');
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+      const res = await fetch(`${API_URL}/api/v1/admin/reports/${selectedReport.id}/reply`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ message: replyMessage })
+      });
+
+      if (res.ok) {
+        alert('Reply sent successfully!');
+        setReplyMessage('');
+        setSelectedReport(null);
+        fetchReports(); // Refresh list
+      } else {
+        alert('Failed to send reply');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error sending reply');
+    } finally {
+      setIsReplying(false);
+    }
+  };
 
   const fetchReports = async () => {
     const token = localStorage.getItem('token');
@@ -195,9 +231,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
     }
   };
 
+  const [financialStats, setFinancialStats] = React.useState<any>(null);
+
+  const fetchFinancialStats = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
+      const res = await fetch(`${API_URL}/api/v1/admin/stats/financial`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        setFinancialStats(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to fetch financial stats", err);
+    }
+  };
+
   React.useEffect(() => {
     if (activeTab === 'reports') {
       fetchReports();
+    } else if (activeTab === 'financials') {
+      fetchFinancialStats();
     }
   }, [activeTab]);
 
@@ -474,21 +531,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
             <span className="text-[9px] font-black text-green-400 uppercase tracking-widest px-2 py-1 bg-green-500/10 rounded-full">Live</span>
           </div>
           <p className="text-gray-500 text-[9px] font-black uppercase tracking-widest mb-1">Revenue (Last 24h)</p>
-          <p className="text-3xl font-black text-white">€1,452.20</p>
+          <p className="text-3xl font-black text-white">€{financialStats?.revenue_24h?.toFixed(2) || '0.00'}</p>
         </div>
         <div className="bg-[#12141a] p-6 rounded-3xl border border-white/5">
           <div className="flex justify-between items-start mb-4">
             <div className="p-3 bg-yellow-500/10 text-yellow-400 rounded-xl"><Banknote size={20} /></div>
           </div>
           <p className="text-gray-500 text-[9px] font-black uppercase tracking-widest mb-1">Coin Circulation</p>
-          <p className="text-3xl font-black text-white">4.2M <span className="text-xs text-gray-500 font-bold">AC</span></p>
+          <p className="text-3xl font-black text-white">
+            {financialStats?.coin_circulation
+              ? financialStats.coin_circulation >= 1000000
+                ? (financialStats.coin_circulation / 1000000).toFixed(1) + 'M'
+                : financialStats.coin_circulation >= 1000
+                  ? (financialStats.coin_circulation / 1000).toFixed(1) + 'k'
+                  : financialStats.coin_circulation.toLocaleString()
+              : '0'}
+            <span className="text-xs text-gray-500 font-bold ml-1">AC</span>
+          </p>
         </div>
         <div className="bg-[#12141a] p-6 rounded-3xl border border-white/5">
           <div className="flex justify-between items-start mb-4">
             <div className="p-3 bg-steam-blue/10 text-steam-blue rounded-xl"><TrendingUp size={20} /></div>
           </div>
           <p className="text-gray-500 text-[9px] font-black uppercase tracking-widest mb-1">Avg. Transaction</p>
-          <p className="text-3xl font-black text-white">450 <span className="text-xs text-gray-500 font-bold">AC</span></p>
+          <p className="text-3xl font-black text-white">{financialStats?.avg_transaction || '0'} <span className="text-xs text-gray-500 font-bold">AC</span></p>
         </div>
         <div className="bg-[#12141a] p-6 rounded-3xl border border-white/5">
           <div className="flex justify-between items-start mb-4">
@@ -496,7 +562,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
             <a href="https://dashboard.stripe.com" target="_blank" className="text-blue-400 hover:text-white"><ExternalLink size={16} /></a>
           </div>
           <p className="text-gray-500 text-[9px] font-black uppercase tracking-widest mb-1">Stripe Status</p>
-          <p className="text-3xl font-black text-white">Operational</p>
+          <p className="text-3xl font-black text-white">{financialStats?.stripe_status || 'Checking...'}</p>
         </div>
       </div>
 
@@ -507,47 +573,53 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
             <button className="text-[10px] text-gray-500 hover:text-white uppercase font-black tracking-widest">Export CSV</button>
           </div>
           <div className="divide-y divide-white/5 max-h-[400px] overflow-y-auto custom-scrollbar">
-            {[...Array(8)].map((_, i) => (
+            {financialStats?.logs?.map((log: any, i: number) => (
               <div key={i} className="p-4 flex items-center justify-between text-xs hover:bg-white/[0.01]">
                 <div className="flex items-center gap-4">
-                  <div className={`w-2 h-2 rounded-full ${i % 2 === 0 ? 'bg-green-500' : 'bg-yellow-500'}`} />
+                  <div className={`w-2 h-2 rounded-full ${log.type === 'DEPOSIT' ? 'bg-green-500' : 'bg-yellow-500'}`} />
                   <div>
-                    <p className="text-white font-bold">{i % 2 === 0 ? 'Artwork Purchase' : 'Coin Package'}</p>
-                    <p className="text-[10px] text-gray-500">User_{i * 32} &rarr; Artist_{i * 12}</p>
+                    <p className="text-white font-bold">{log.type}</p>
+                    <p className="text-[10px] text-gray-500">{log.user_name} ({log.user_steam_id})</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-white font-mono font-bold">{i % 2 === 0 ? '500 AC' : '€10.00'}</p>
-                  <p className="text-[9px] text-gray-500 uppercase tracking-widest">2m ago</p>
+                  <p className="text-white font-mono font-bold">{log.amount} AC</p>
+                  <p className="text-[9px] text-gray-500 uppercase tracking-widest">{new Date(log.created_at).toLocaleTimeString()}</p>
                 </div>
               </div>
             ))}
+            {(!financialStats?.logs || financialStats.logs.length === 0) && (
+              <div className="p-8 text-center text-gray-500 text-xs">No recent transactions</div>
+            )}
           </div>
         </section>
 
         <section className="bg-[#12141a] border border-white/5 rounded-3xl overflow-hidden">
           <div className="p-6 border-b border-white/5 flex items-center justify-between">
             <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2"><DollarSign size={16} className="text-green-500" /> Payout Queue</h3>
-            <span className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest">24 Pending</span>
+            <span className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest">{financialStats?.payouts?.length || 0} Pending</span>
           </div>
           <div className="divide-y divide-white/5">
-            {[1, 2, 3].map(i => (
+            {financialStats?.payouts?.map((payout: any, i: number) => (
               <div key={i} className="p-5 flex items-center justify-between group hover:bg-white/[0.01]">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center text-green-500">
                     <Banknote size={18} />
                   </div>
                   <div>
-                    <h4 className="text-white font-bold text-xs">Payout: EliteCreator_{i}</h4>
-                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5">Method: PayPal • Requested 4h ago</p>
+                    <h4 className="text-white font-bold text-xs">Payout: {payout.user_name}</h4>
+                    <p className="text-[10px] text-gray-500 font-black uppercase tracking-widest mt-0.5">Requested {new Date(payout.created_at).toLocaleTimeString()}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <p className="text-white font-mono font-bold">€142.50</p>
+                  <p className="text-white font-mono font-bold">AC {payout.amount}</p>
                   <button className="px-4 py-2 bg-green-500 text-black text-[9px] font-black uppercase tracking-widest rounded-lg">Process</button>
                 </div>
               </div>
             ))}
+            {(!financialStats?.payouts || financialStats.payouts.length === 0) && (
+              <div className="p-8 text-center text-gray-500 text-xs">No pending payouts</div>
+            )}
           </div>
         </section>
       </div>
@@ -696,6 +768,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
               { id: 'users', label: 'Users', icon: <Users size={14} /> },
               { id: 'financials', label: 'Engine', icon: <DollarSign size={14} /> },
               { id: 'content', label: 'Market', icon: <Layout size={14} /> },
+              { id: 'ads', label: 'Ads', icon: <Layout size={14} /> },
               { id: 'health', label: 'Health', icon: <Zap size={14} /> },
             ].map(tab => (
               <button
@@ -731,6 +804,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
           {activeTab === 'users' && renderUsers()}
           {activeTab === 'financials' && renderFinancials()}
           {activeTab === 'content' && renderContent()}
+          {activeTab === 'ads' && <div className="animate-in fade-in duration-500"><AdsManagement /></div>}
           {activeTab === 'health' && renderHealth()}
         </AnimatePresence>
       </div>
@@ -891,9 +965,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ setPage, onInspect }) => {
                 </div>
               </div>
 
+              <div className="mb-8">
+                <h3 className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-2">Reply to Reporter</h3>
+                <textarea
+                  value={replyMessage}
+                  onChange={e => setReplyMessage(e.target.value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-steam-blue/50 resize-none"
+                  placeholder="Type your message here..."
+                  rows={3}
+                />
+              </div>
+
               <div className="flex gap-3">
                 <button onClick={() => setSelectedReport(null)} className="flex-1 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-gray-400 font-black text-xs uppercase tracking-widest">Close</button>
-                <button className="flex-1 py-3 bg-red-500 hover:bg-red-600 rounded-xl text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-red-500/20">Take Action</button>
+                <button
+                  onClick={handleReply}
+                  disabled={!replyMessage || isReplying}
+                  className="flex-1 py-3 bg-steam-blue hover:bg-steam-blue/80 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl text-black font-black text-xs uppercase tracking-widest shadow-lg shadow-steam-blue/20"
+                >
+                  {isReplying ? 'Sending...' : 'Send Reply & Resolve'}
+                </button>
               </div>
             </div>
           </motion.div>

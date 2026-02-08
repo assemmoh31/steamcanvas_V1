@@ -14,6 +14,100 @@ const COIN_PACKS: Record<string, { price: number; coins: number; bonus: number; 
     MASTER: { price: 9999, coins: 12000, bonus: 2000 }
 };
 
+// TODO: Replace these with your actual Stripe Price IDs (e.g., price_1Os...)
+const SUBSCRIPTION_PLANS: Record<string, Record<string, string>> = {
+    CREATOR: {
+        monthly: 'price_1SyBgyBUxNgPTyl577F28GSp', // Example ID
+        yearly: 'price_1SyBi0BUxNgPTyl5AVOYnnen'
+    },
+    ELITE: {
+        monthly: 'price_1SyBj1BUxNgPTyl55rPrvgTP',
+        yearly: 'price_1SyBk2BUxNgPTyl5cRy0e3Jn'
+    },
+    PRO: {
+        monthly: 'price_1SyBkqBUxNgPTyl5LN5kHP8P',
+        yearly: 'price_1SyBlUBUxNgPTyl5vuuUNYfP'
+    }
+};
+
+// Helper: Get or Create Stripe Customer
+async function getOrCreateStripeCustomer(stripe: Stripe, db: D1Database, steamId: string, username?: string) {
+    const dbUser = await db.prepare('SELECT id, stripe_customer_id FROM Users WHERE steam_id = ?').bind(steamId).first();
+    if (!dbUser) throw new Error('User not found in database');
+
+    if (dbUser.stripe_customer_id) {
+        return dbUser.stripe_customer_id as string;
+    }
+
+    // Create new Customer in Stripe
+    const customer = await stripe.customers.create({
+        name: username || `User ${steamId}`,
+        metadata: {
+            steam_id: steamId,
+            db_user_id: dbUser.id as number
+        }
+    });
+
+    // Save Customer ID to DB
+    await db.prepare('UPDATE Users SET stripe_customer_id = ? WHERE id = ?')
+        .bind(customer.id, dbUser.id).run();
+
+    return customer.id;
+}
+
+// 1.5 Create Subscription Session
+app.post('/create-subscription-session', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
+    const { plan_name, billing_cycle } = await c.req.json();
+
+    if (!c.env.STRIPE_SECRET_KEY) {
+        return c.json({ error: 'Stripe not configured' }, 500);
+    }
+
+    const plan = SUBSCRIPTION_PLANS[plan_name];
+    if (!plan) return c.json({ error: 'Invalid plan' }, 400);
+
+    const priceId = plan[billing_cycle];
+    if (!priceId) return c.json({ error: 'Invalid billing cycle' }, 400);
+
+    const stripe = new Stripe(c.env.STRIPE_SECRET_KEY, {
+        apiVersion: '2025-01-27.acacia',
+    });
+
+    try {
+        const dbUser = await c.env.STEAMCANVAS_DB.prepare('SELECT id FROM Users WHERE steam_id = ?').bind(user.sub).first();
+        if (!dbUser) return c.json({ error: 'User not found' }, 404);
+
+        // Auto-create/fetch Stripe Customer
+        const customerId = await getOrCreateStripeCustomer(stripe, c.env.STEAMCANVAS_DB, user.sub, user.name);
+
+        const session = await stripe.checkout.sessions.create({
+            customer: customerId, // REQUIRED for adherence to new Stripe rules
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price: priceId,
+                    quantity: 1,
+                },
+            ],
+            mode: 'subscription',
+            success_url: `${c.env.FRONTEND_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${c.env.FRONTEND_URL}/subscription`,
+            metadata: {
+                user_id: dbUser.id,
+                steam_id: user.sub,
+                plan_name: plan_name,
+                type: 'SUBSCRIPTION'
+            },
+        });
+
+        return c.json({ url: session.url });
+    } catch (error: any) {
+        console.error('Subscription Session Error:', error);
+        return c.json({ error: error.message }, 500);
+    }
+});
+
 // 2. Checkout Route
 app.post('/create-session', authMiddleware, async (c) => {
     const user = c.get('user') as any;
@@ -111,41 +205,78 @@ async function fulfillPurchase(db: D1Database, purchase: any, customPrice?: numb
 }
 
 // 4. Verify Session (Fallback for Webhooks)
-app.get('/verify-session', async (c) => {
+app.get('/verify-session', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
     const sessionId = c.req.query('session_id');
     if (!sessionId) return c.json({ error: 'Missing session_id' }, 400);
 
-    // 1. Check DB first
+    // 1. Check DB first (Fast Path for Coin Packs)
     const purchase = await c.env.STEAMCANVAS_DB.prepare('SELECT * FROM coin_purchases WHERE session_id = ?').bind(sessionId).first();
 
-    if (!purchase) return c.json({ error: 'Purchase record not found' }, 404);
-    if (purchase.status === 'COMPLETED') return c.json({ success: true, status: 'COMPLETED' });
+    if (purchase && purchase.status === 'COMPLETED') {
+        return c.json({ success: true, status: 'COMPLETED' });
+    }
 
-    // 2. If PENDING, check with Stripe directly
-    if (!c.env.STRIPE_SECRET_KEY) return c.json({ error: 'Stripe config missing' }, 500);
+    // 2. Hybrid: Check with Stripe (for Subscriptions or pending Coin Packs)
+    if (!c.env.STRIPE_SECRET_KEY) return c.json({ error: 'Stripe configuration missing' }, 500);
+
     const stripe = new Stripe(c.env.STRIPE_SECRET_KEY, { apiVersion: '2025-01-27.acacia' });
 
     try {
         const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+        // 3. Security Check: Ensure session belongs to this user
+        const sessionSteamId = session.metadata?.steam_id;
+
+        if (sessionSteamId && sessionSteamId !== user.sub) {
+            console.warn(`[Security] Session ownership mismatch. User: ${user.sub}, Session: ${sessionSteamId}`);
+            return c.json({ error: 'Unauthorized: Session belongs to another user' }, 403);
+        }
+
+        // 4. Handle Subscription
+        if (session.mode === 'subscription') {
+            if (session.payment_status === 'paid') {
+                // Update User's Plan Tier immediately
+                const planName = session.metadata?.plan_name;
+                if (planName) {
+                    await c.env.STEAMCANVAS_DB.prepare('UPDATE Users SET plan_tier = ? WHERE steam_id = ?')
+                        .bind(planName, user.sub).run();
+                }
+
+                // Return success immediately for UX
+                return c.json({ success: true, status: 'COMPLETED', type: 'SUBSCRIPTION', plan: planName });
+            } else {
+                return c.json({ success: false, status: 'pending' });
+            }
+        }
+
+        // 5. Handle Coin Pack (Recovery for "Processing" status)
         if (session.payment_status === 'paid') {
-            // Update purchase record with payment intent if missing (important for refunds!)
-            if (!purchase.payment_intent_id && session.payment_intent) {
-                await c.env.STEAMCANVAS_DB.prepare("UPDATE coin_purchases SET payment_intent_id = ? WHERE id = ?")
-                    .bind(session.payment_intent, purchase.id).run();
-                purchase.payment_intent_id = session.payment_intent; // Update local obj for fulfill
+            // Attempt Just-In-Time Fulfillment if record exists but is PENDING
+            if (purchase && purchase.status !== 'COMPLETED') {
+                // Update Payment Intent ID if missing
+                if (!purchase.payment_intent_id && session.payment_intent) {
+                    await c.env.STEAMCANVAS_DB.prepare("UPDATE coin_purchases SET payment_intent_id = ? WHERE id = ?")
+                        .bind(session.payment_intent, purchase.id).run();
+                    purchase.payment_intent_id = session.payment_intent;
+                }
+
+                const success = await fulfillPurchase(c.env.STEAMCANVAS_DB, purchase);
+                if (success) {
+                    return c.json({ success: true, status: 'COMPLETED', fulfilled_now: true });
+                }
             }
 
-            const success = await fulfillPurchase(c.env.STEAMCANVAS_DB, purchase);
-            if (success) {
-                return c.json({ success: true, status: 'COMPLETED', fulfilled_now: true });
-            } else {
-                return c.json({ error: 'Fulfillment failed' }, 500);
-            }
-        } else {
-            return c.json({ success: false, status: session.payment_status });
+            // If purchase not in DB (edge case) or fulfill failed, but it IS paid:
+            // Return success to user (Frontend will show Success), backend needs to reconcile via Webhooks.
+            return c.json({ success: true, status: 'COMPLETED', note: 'Awaiting Webhook' });
         }
+
+        return c.json({ success: false, status: session.payment_status || 'pending' });
+
     } catch (e: any) {
-        return c.json({ error: e.message }, 500);
+        console.error('[Verify] Stripe Error:', e);
+        return c.json({ error: 'Session verification failed', details: e.message }, 500);
     }
 });
 

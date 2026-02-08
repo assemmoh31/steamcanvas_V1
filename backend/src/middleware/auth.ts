@@ -17,3 +17,14 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         return c.json({ error: 'Unauthorized: Invalid token', cause: err.message }, 401);
     }
 });
+
+export const adminCheck = createMiddleware(async (c, next) => {
+    const user = c.get('user');
+    // Check if user is admin in DB
+    const dbUser = await c.env.STEAMCANVAS_DB.prepare('SELECT is_admin FROM Users WHERE steam_id = ?').bind(user.sub).first();
+
+    if (!dbUser || !dbUser.is_admin) {
+        return c.json({ error: 'Unauthorized: Admin access required' }, 403);
+    }
+    await next();
+});

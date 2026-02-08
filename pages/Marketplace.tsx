@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Artwork, ArtworkCategory } from '../types';
 import { getArtworks, buyArtwork } from '../services/mockApi';
 import ArtworkCard from '../components/ArtworkCard';
+import Banner from '../components/Banner';
 import { Search, Filter, Image as ImageIcon, Box, X, ChevronRight, Palette, Tag, Banknote, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -11,9 +12,43 @@ interface MarketplaceProps {
   artworks: Artwork[];
 }
 
+
+
+interface BannerConfig {
+  ads_enabled: boolean;
+  interval: number;
+  banners: any[];
+}
+
 const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) => {
-  const [loading, setLoading] = useState(false); // Controlled by parent passing data
+  const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [bannerConfig, setBannerConfig] = useState<BannerConfig>({ ads_enabled: false, interval: 15, banners: [] });
+
+  useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        // Use window.location to determine API URL if env missing
+        const API_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8787';
+        console.log("Fetching banners from:", `${API_URL}/api/v1/banners`);
+
+        const res = await fetch(`${API_URL}/api/v1/banners`);
+        if (res.ok) {
+          const data = await res.json();
+          console.log("Banner Config Loaded:", data);
+          // Ensure min interval of 3
+          if (data.interval < 3) data.interval = 3;
+          if (data.banners?.length === 0) console.warn("No active banners found in response");
+          setBannerConfig(data);
+        } else {
+          console.error("Failed to fetch banners:", res.status, res.statusText);
+        }
+      } catch (e) {
+        console.error("Failed to load ads", e);
+      }
+    };
+    fetchBanners();
+  }, []);
   const [activeCategory, setActiveCategory] = useState<ArtworkCategory | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
@@ -48,9 +83,21 @@ const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) 
 
     const matchesCategory = activeCategory === 'all' || a.category === activeCategory;
 
-    const matchesTheme = selectedThemes.length === 0 || (a.theme && selectedThemes.includes(a.theme));
+    // Check themes against tags (case insensitive)
+    const matchesTheme = selectedThemes.length === 0 ||
+      selectedThemes.some(theme =>
+        a.tags.some(tag => tag.toLowerCase() === theme.toLowerCase()) ||
+        (a.theme && a.theme.toLowerCase() === theme.toLowerCase())
+      );
 
-    const matchesColor = selectedColors.length === 0 || (a.colors && a.colors.some(c => selectedColors.includes(c)));
+    // Check colors (case insensitive)
+    const matchesColor = selectedColors.length === 0 ||
+      (a.colors && a.colors.some(c =>
+        selectedColors.some(sc => sc.toLowerCase() === c.toLowerCase())
+      )) ||
+      (a.dominant_colors && JSON.parse(a.dominant_colors).some((c: string) =>
+        selectedColors.some(sc => sc.toLowerCase() === c.toLowerCase())
+      ));
 
     const matchesPrice = priceRange === 'all' ||
       (priceRange === 'free' && a.price === 0) ||
@@ -155,9 +202,27 @@ const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-12">
           <AnimatePresence mode="popLayout">
             {filteredArtworks.length > 0 ? (
-              filteredArtworks.map((artwork) => (
-                <ArtworkCard key={artwork.id} artwork={artwork} onBuy={handleBuy} onClick={onSelectArtwork} />
-              ))
+              filteredArtworks.flatMap((artwork, index) => {
+                const elements = [<ArtworkCard key={artwork.id} artwork={artwork} onBuy={handleBuy} onClick={onSelectArtwork} />];
+
+                // Inject Banner
+                if (bannerConfig.ads_enabled && bannerConfig.banners?.length > 0 && (index + 1) % bannerConfig.interval === 0) {
+                  const bannerIndex = Math.floor((index + 1) / bannerConfig.interval) % bannerConfig.banners.length;
+                  const banner = bannerConfig.banners[bannerIndex];
+                  elements.push(
+                    <motion.div
+                      key={`ad-${banner.id}-${index}`}
+                      layout
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="col-span-full w-full py-4"
+                    >
+                      <Banner banner={banner} />
+                    </motion.div>
+                  );
+                }
+                return elements;
+              })
             ) : (
               <motion.div
                 initial={{ opacity: 0 }}

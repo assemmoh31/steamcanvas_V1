@@ -7,6 +7,8 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { buildSteamAuthUrl, verifySteamAssertion, getSteamUserSummary } from './auth';
 import { authMiddleware } from './middleware/auth';
 import payments from './payments';
+import adminBanners from './admin/banners';
+import banners from './routes/banners';
 
 type Bindings = {
     STEAMCANVAS_DB: D1Database;
@@ -23,7 +25,11 @@ type Bindings = {
     STRIPE_WEBHOOK_SECRET: string;
 };
 
-const app = new Hono<{ Bindings: Bindings }>();
+type Variables = {
+    user: any;
+};
+
+const app = new Hono<{ Bindings: Bindings, Variables: Variables }>();
 
 // CORS Middleware
 app.use('/*', cors({
@@ -98,6 +104,10 @@ app.get('/api/v1/artworks', async (c) => {
 // Payment Routes
 app.route('/api/v1/payments', payments);
 
+// Banner Routes
+app.route('/api/v1/admin', adminBanners);
+app.route('/api/v1', banners);
+
 // ... (Auth routes remain the same) ...
 
 // --- ADMIN ROUTES ---
@@ -150,7 +160,7 @@ app.post('/api/v1/assets/finalize', authMiddleware, async (c) => {
 
     const {
         title, description, price, tags, dominantColors,
-        isAiGenerated, previewKey, sourceKey, category
+        isAiGenerated, previewKey, sourceKey, category, fileSize
     } = body;
 
     if (!title || !previewKey || !sourceKey) {
@@ -179,8 +189,8 @@ app.post('/api/v1/assets/finalize', authMiddleware, async (c) => {
             INSERT INTO Artworks (
                 id, title, description, price, creator_id, preview_url, 
                 category, tags, dominant_colors, is_ai_generated, 
-                preview_key, source_key, author_type, status, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', CURRENT_TIMESTAMP)
+                preview_key, source_key, author_type, status, created_at, file_size_bytes
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', CURRENT_TIMESTAMP, ?)
         `).bind(
             artworkId, title, description, price, creatorId, imageUrl,
             category || 'artwork',
@@ -188,7 +198,8 @@ app.post('/api/v1/assets/finalize', authMiddleware, async (c) => {
             JSON.stringify(dominantColors || []),
             isAiGenerated ? 1 : 0,
             previewKey, sourceKey,
-            isAiGenerated ? 'AI' : 'HUMAN'
+            isAiGenerated ? 'AI' : 'HUMAN',
+            fileSize || 0
         ).run();
 
         return c.json({ success: true, artworkId });
@@ -439,6 +450,21 @@ app.get('/api/v1/auth/steam/callback', async (c) => {
     }
 });
 
+// Helper: Get Plan Metadata
+function getPlanMetadata(tier: string) {
+    const tierUpper = (tier || 'FREE').toUpperCase();
+    switch (tierUpper) {
+        case 'ELITE':
+            return { label: 'ELITE', color: '#FBBF24', gradient: 'from-yellow-400 to-amber-600' };
+        case 'PRO':
+            return { label: 'PRO', color: '#3B82F6', gradient: 'from-blue-500 to-blue-600' };
+        case 'CREATOR': // Mapping CREATOR to BASIC or keeping as CREATOR
+            return { label: 'CREATOR', color: '#10B981', gradient: 'from-green-500 to-emerald-600' };
+        default:
+            return { label: 'BASIC', color: '#9CA3AF', gradient: 'bg-white/10' };
+    }
+}
+
 // Protected Route: Get User Profile
 app.get('/api/v1/user/profile', authMiddleware, async (c) => {
     const user = c.get('user') as any; // Injected by authMiddleware
@@ -452,6 +478,16 @@ app.get('/api/v1/user/profile', authMiddleware, async (c) => {
         return c.json({ error: 'User not found' }, 404);
     }
 
+    const planTier = (result.plan_tier as string) || 'FREE';
+
+    // Calculate Storage Used
+    const storageResult = await c.env.STEAMCANVAS_DB.prepare(
+        'SELECT SUM(file_size_bytes) as total_size FROM Artworks WHERE creator_id = ?'
+    ).bind(steamId).first();
+
+    const storageUsedBytes = (storageResult?.total_size as number) || 0;
+    const storageUsedGB = storageUsedBytes / (1024 * 1024 * 1024);
+
     return c.json({
         id: result.id,
         steamId: result.steam_id,
@@ -459,7 +495,11 @@ app.get('/api/v1/user/profile', authMiddleware, async (c) => {
         avatarUrl: result.avatar_url,
         purchaseCoins: result.balance || 0,
         creatorCoins: 0, // Placeholder for future feature
-        status: 'Member' // Placeholder
+        status: 'Member', // Placeholder
+        plan_tier: planTier,
+        plan_metadata: getPlanMetadata(planTier),
+        storageUsed: storageUsedGB,
+        storageLimit: 0.03 // 0.03 GB (approx 30MB) Limit
     });
 });
 
@@ -670,6 +710,30 @@ app.post('/api/v1/assets/upload-intent', authMiddleware, async (c) => {
         return c.json({ error: 'Missing metadata for preview or source' }, 400);
     }
 
+    // STORAGE LIMIT CHECK
+    const STORAGE_LIMIT_GB = 0.03;
+    const STORAGE_LIMIT_BYTES = STORAGE_LIMIT_GB * 1024 * 1024 * 1024;
+
+    // 1. Get current usage
+    const storageResult = await c.env.STEAMCANVAS_DB.prepare(
+        'SELECT SUM(file_size_bytes) as total_size FROM Artworks WHERE creator_id = ?'
+    ).bind(user.sub).first();
+
+    const currentUsageFn = (storageResult?.total_size as number) || 0;
+
+    // 2. Predict new usage
+    const newFilesSize = (previewMetadata.size || 0) + (sourceMetadata.size || 0);
+    const projectedUsage = currentUsageFn + newFilesSize;
+
+    if (projectedUsage > STORAGE_LIMIT_BYTES) {
+        return c.json({
+            error: 'Storage limit exceeded. Please upgrade your storage plan to continue uploading.',
+            code: 'STORAGE_LIMIT_EXCEEDED',
+            current: currentUsageFn,
+            limit: STORAGE_LIMIT_BYTES
+        }, 403);
+    }
+
     const timestamp = Date.now();
 
     // Generate Keys
@@ -830,6 +894,91 @@ app.post('/api/v1/reports', authMiddleware, async (c) => {
     } catch (error: any) {
         console.error('Report Error:', error);
         return c.json({ error: 'Failed to submit report', details: error.message }, 500);
+    }
+});
+
+// Admin: Reply to Report
+app.post('/api/v1/admin/reports/:id/reply', authMiddleware, adminCheck, async (c) => {
+    const reportId = c.req.param('id');
+    const { message } = await c.req.json();
+
+    if (!message) return c.json({ error: 'Message is required' }, 400);
+
+    try {
+        // 1. Get Report Details
+        const report = await c.env.STEAMCANVAS_DB.prepare('SELECT reporter_id, artwork_id, reason FROM Reports WHERE id = ?').bind(reportId).first();
+
+        if (!report) return c.json({ error: 'Report not found' }, 404);
+
+        // 2. Notify Reporter
+        await createNotification(
+            c.env.STEAMCANVAS_DB,
+            report.reporter_id as string,
+            'system',
+            'Admin Response to your Report',
+            `Admin Message: "${message}" regarding your report on ${report.artwork_id}.`,
+            'Status: Resolved'
+        );
+
+        // 3. Update Report Status
+        await c.env.STEAMCANVAS_DB.prepare("UPDATE Reports SET status = 'RESOLVED' WHERE id = ?").bind(reportId).run();
+
+        return c.json({ success: true, message: 'Reply sent and report resolved' });
+    } catch (error) {
+        console.error('Reply Error:', error);
+        return c.json({ error: 'Failed to send reply' }, 500);
+    }
+});
+
+// Admin: Get Financial Stats
+app.get('/api/v1/admin/stats/financial', authMiddleware, adminCheck, async (c) => {
+    try {
+        // 1. Revenue (Last 24h) from Coin Purchases
+        const revenueResult = await c.env.STEAMCANVAS_DB.prepare(`
+            SELECT SUM(amount_price) as revenue 
+            FROM coin_purchases 
+            WHERE status = 'COMPLETED' 
+            AND created_at > datetime('now', '-1 day')
+        `).first();
+        const revenue = (revenueResult?.revenue as number || 0) / 100; // Convert cents to currency unit
+
+        // 2. Coin Circulation (Total User Balance)
+        const circulationResult = await c.env.STEAMCANVAS_DB.prepare('SELECT SUM(balance) as total FROM Users').first();
+        const circulation = circulationResult?.total as number || 0;
+
+        // 3. Avg. Transaction (Internal Purchases)
+        const avgTxResult = await c.env.STEAMCANVAS_DB.prepare("SELECT AVG(amount) as avg_amount FROM Transactions WHERE type = 'PURCHASE'").first();
+        const avgTransaction = Math.round(avgTxResult?.avg_amount as number || 0);
+
+        // 4. Transaction Logs
+        const { results: logs } = await c.env.STEAMCANVAS_DB.prepare(`
+            SELECT t.id, t.type, t.amount, t.created_at, u.username as user_name, u.steam_id as user_steam_id
+            FROM Transactions t
+            JOIN Users u ON t.user_id = u.id
+            ORDER BY t.created_at DESC
+            LIMIT 10
+        `).all();
+
+        // 5. Payout Queue (Pending Withdrawals)
+        const { results: payouts } = await c.env.STEAMCANVAS_DB.prepare(`
+            SELECT t.id, t.amount, t.created_at, u.username as user_name
+            FROM Transactions t
+            JOIN Users u ON t.user_id = u.id
+            WHERE t.type = 'WITHDRAWAL' AND t.status = 'PENDING'
+            ORDER BY t.created_at ASC
+        `).all();
+
+        return c.json({
+            revenue_24h: revenue,
+            coin_circulation: circulation,
+            avg_transaction: avgTransaction,
+            stripe_status: 'Operational', // Mock for now
+            logs,
+            payouts
+        });
+    } catch (error: any) {
+        console.error('Financial Stats Error:', error);
+        return c.json({ error: 'Failed to fetch financial stats' }, 500);
     }
 });
 

@@ -8,6 +8,7 @@ export interface User {
   creatorCoins: number;  // Coin B
   totalSales: number;    // XP (Total AC generated)
   status?: 'Creator' | 'Pro' | 'Elite';
+  plan_tier?: string;    // Added for Subscription Plans
   storageUsed?: number;  // in GB
   storageLimit?: number; // in GB
 }
@@ -36,6 +37,7 @@ export interface Artwork {
   fileType?: string;
   theme?: string;
   colors?: string[];
+  dominant_colors?: string;
   creatorAvatar?: string;
 }
 

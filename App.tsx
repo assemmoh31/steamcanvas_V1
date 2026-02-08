@@ -16,6 +16,7 @@ import ThemeFinder from './pages/ThemeFinder';
 import UploadArtwork from './pages/UploadArtwork';
 import AdminPanel from './pages/AdminPanel';
 import AdminInspection from './pages/AdminInspection';
+import AdsManagement from './pages/Admin/AdsManagement';
 import Footer from './components/Footer';
 import HelpCenter from './pages/HelpCenter';
 import CustomGuide from './pages/CustomGuide';
@@ -158,6 +159,8 @@ function App() {
         return <AdminPanel setPage={setCurrentPage} onInspect={(id) => { setSelectedArtworkId(id); setCurrentPage('admin-inspect'); }} />;
       case 'admin-inspect':
         return <AdminInspection id={selectedArtworkId} setPage={setCurrentPage} />;
+      case 'ads-management':
+        return <AdsManagement />;
       case 'gallery':
         if (!user) return <div className="pt-32 text-center text-gray-400">Please login to view gallery.</div>;
         return <Gallery user={user} setPage={setCurrentPage} />;

@@ -26,7 +26,12 @@ const PaymentSuccess: React.FC<{ setPage: (page: string) => void }> = ({ setPage
 
             try {
                 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8787';
-                const response = await fetch(`${API_URL}/api/v1/payments/verify-session?session_id=${sessionId}`);
+                const token = localStorage.getItem('token');
+                const response = await fetch(`${API_URL}/api/v1/payments/verify-session?session_id=${sessionId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
                 const data = await response.json();
 
                 if (data.success) {

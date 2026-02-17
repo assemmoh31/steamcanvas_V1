@@ -31,6 +31,7 @@ import { getUser, getArtworks, buyArtwork, getInventory } from './services/mockA
 import AuthCallback from './pages/AuthCallback';
 import PaymentSuccess from './pages/PaymentSuccess';
 import Gallery from './pages/Gallery';
+import Settings from './pages/Settings';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -88,6 +89,12 @@ function App() {
     window.location.href = `${API_URL}/api/v1/auth/steam`;
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    setCurrentPage('home');
+  };
+
   const handleBuy = async (id: string) => {
     const success = await buyArtwork(id);
     if (success) {
@@ -137,6 +144,9 @@ function App() {
       case 'profile':
         if (!user) return <div className="pt-32 text-center text-gray-400">Please login to view profile.</div>;
         return <Profile user={user} artworks={allArtworks} onBuy={handleBuy} setPage={setCurrentPage} />;
+      case 'settings':
+        if (!user) return <div className="pt-32 text-center text-gray-400">Please login to view settings.</div>;
+        return <Settings user={user} setPage={setCurrentPage} />;
       case 'subscription':
         return <Subscription setPage={setCurrentPage} />;
       case 'help-center':
@@ -191,6 +201,7 @@ function App() {
         currentPage={currentPage}
         setPage={setCurrentPage}
         onLogin={handleLogin}
+        onLogout={handleLogout}
       />
       <main className="fade-in flex-1">
         {renderPage()}

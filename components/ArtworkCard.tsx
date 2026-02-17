@@ -104,10 +104,10 @@ const ArtworkCard: React.FC<ArtworkCardProps> = ({ artwork, onBuy, onClick }) =>
             <div className="flex justify-between items-end">
               <div className="space-y-1 overflow-hidden">
                 <h3 className="text-white font-black text-lg leading-tight truncate drop-shadow-lg">{artwork.title}</h3>
-                <p className="text-[10px] text-gray-300 uppercase tracking-widest font-bold flex items-center gap-1">
+                <div className="text-[10px] text-gray-300 uppercase tracking-widest font-bold flex items-center gap-1">
                   by <span className="text-white relative after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-0 after:h-[1px] after:bg-white after:transition-all group-hover:after:w-full">{artwork.creatorName}</span>
                   <CreatorTag status={artwork.creatorStatus} size="sm" className="scale-75 origin-left" />
-                </p>
+                </div>
               </div>
               <div className="shrink-0 flex flex-col items-end">
                 <span className={`text-lg font-black ${artwork.price === 0 ? 'text-green-400' : 'text-white'}`} style={{ textShadow: `0 0 20px ${dominantColor}60` }}>

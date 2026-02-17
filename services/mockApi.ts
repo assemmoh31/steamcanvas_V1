@@ -166,7 +166,11 @@ export const getUser = async (): Promise<User | null> => {
       status: data.status,
       plan_tier: data.plan_tier, // Correctly mapped from API
       storageUsed: data.storageUsed || 0,
-      storageLimit: data.storageLimit || 1.0
+      storageLimit: data.storageLimit || 1.0,
+      bio_headline: data.bio_headline,
+      bio_content: data.bio_content,
+      social_links: data.social_links,
+      creator_tools: data.creator_tools
     };
   } catch (err) {
     console.error('Failed to fetch user:', err);

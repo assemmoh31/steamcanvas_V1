@@ -11,6 +11,10 @@ export interface User {
   plan_tier?: string;    // Added for Subscription Plans
   storageUsed?: number;  // in GB
   storageLimit?: number; // in GB
+  bio_headline?: string;
+  bio_content?: string;
+  social_links?: string; // JSON string
+  creator_tools?: string; // Comma-separated list
 }
 
 export type ArtworkCategory = 'artwork' | 'workshop';

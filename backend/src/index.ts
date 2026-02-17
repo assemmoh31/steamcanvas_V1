@@ -25,6 +25,8 @@ type Bindings = {
     STRIPE_WEBHOOK_SECRET: string;
 };
 
+import gifOptimizer from './tools/gif-optimizer';
+
 type Variables = {
     user: any;
 };
@@ -107,6 +109,9 @@ app.route('/api/v1/payments', payments);
 // Banner Routes
 app.route('/api/v1/admin', adminBanners);
 app.route('/api/v1', banners);
+
+// Tool Routes
+app.route('/api/v1/tools/gif-optimizer', gifOptimizer);
 
 // ... (Auth routes remain the same) ...
 
@@ -494,12 +499,83 @@ app.get('/api/v1/user/profile', authMiddleware, async (c) => {
         username: result.username,
         avatarUrl: result.avatar_url,
         purchaseCoins: result.balance || 0,
-        creatorCoins: 0, // Placeholder for future feature
+        creatorCoins: result.creator_balance || 0,
         status: 'Member', // Placeholder
         plan_tier: planTier,
         plan_metadata: getPlanMetadata(planTier),
         storageUsed: storageUsedGB,
-        storageLimit: 0.03 // 0.03 GB (approx 30MB) Limit
+        storageLimit: 0.03, // 0.03 GB (approx 30MB) Limit
+        bio_headline: result.bio_headline || '',
+        bio_content: result.bio_content || '',
+        social_links: result.social_links || '{}',
+        creator_tools: result.creator_tools || ''
+    });
+});
+
+// Protected Route: Update User Profile (Bio)
+app.patch('/api/v1/user/profile', authMiddleware, async (c) => {
+    const user = c.get('user') as any;
+    const body = await c.req.json();
+    const { bio_headline, bio_content, social_links, creator_tools } = body;
+
+    try {
+        await c.env.STEAMCANVAS_DB.prepare(`
+            UPDATE Users SET 
+                bio_headline = ?, 
+                bio_content = ?, 
+                social_links = ? 
+                -- creator_tools removed from here as it's not in the update list
+            WHERE steam_id = ?
+        `).bind(
+            bio_headline || null,
+            bio_content || null,
+            JSON.stringify(social_links || {}),
+            user.sub
+        ).run();
+
+        // Separate update for creator_tools if provided
+        if (creator_tools !== undefined) {
+            await c.env.STEAMCANVAS_DB.prepare(`UPDATE Users SET creator_tools = ? WHERE steam_id = ?`).bind(creator_tools, user.sub).run();
+        }
+
+        return c.json({ success: true, message: 'Profile updated' });
+    } catch (error: any) {
+        console.error('Update Profile Error:', error);
+        return c.json({ error: 'Failed to update profile', details: error.message }, 500);
+    }
+});
+
+// Public Route: Get User Profile by ID (for viewing others)
+app.get('/api/v1/user/:id/profile', async (c) => {
+    const steamId = c.req.param('id');
+
+    const result = await c.env.STEAMCANVAS_DB.prepare(
+        'SELECT id, steam_id, username, avatar_url, plan_tier, bio_headline, bio_content, social_links, creator_tools FROM Users WHERE steam_id = ?'
+    ).bind(steamId).first();
+
+    if (!result) {
+        return c.json({ error: 'User not found' }, 404);
+    }
+
+    const planTier = (result.plan_tier as string) || 'FREE';
+
+    // Calculate Stats for Public Display
+    const salesResult = await c.env.STEAMCANVAS_DB.prepare(
+        'SELECT COUNT(*) as total_sales FROM Inventory JOIN Artworks ON Inventory.artwork_id = Artworks.id WHERE Artworks.creator_id = ?'
+    ).bind(steamId).first();
+
+    return c.json({
+        id: result.id,
+        steamId: result.steam_id,
+        username: result.username,
+        avatarUrl: result.avatar_url,
+        plan_tier: planTier,
+        plan_metadata: getPlanMetadata(planTier),
+        totalSales: salesResult?.total_sales || 0,
+        bio_headline: result.bio_headline || '',
+        bio_content: result.bio_content || '',
+        social_links: result.social_links || '{}',
+        creator_tools: result.creator_tools || ''
     });
 });
 
@@ -649,24 +725,34 @@ app.post('/api/v1/purchase', authMiddleware, async (c) => {
     // 4. Calculate Split (15% platform fee)
     const platformFee = Math.floor(price * 0.15);
     const creatorShare = price - platformFee;
+    const platformOwnerSteamId = '76561199401459158';
 
     // 5. Execute Transaction (Atomic Batch)
     try {
         const batch = [
-            // Deduct from Buyer
+            // Deduct from Buyer (Purchase Coins)
             c.env.STEAMCANVAS_DB.prepare('UPDATE Users SET balance = balance - ? WHERE id = ?').bind(price, buyer.id),
 
             // Credit Logic (Only if price > 0)
             ...(price > 0 ? [
-                // Add to Creator
-                c.env.STEAMCANVAS_DB.prepare('UPDATE Users SET balance = balance + ? WHERE id = ?').bind(creatorShare, creatorUid)
+                // Add to Creator (Creator Coins)
+                c.env.STEAMCANVAS_DB.prepare('UPDATE Users SET creator_balance = creator_balance + ? WHERE id = ?').bind(creatorShare, creatorUid),
+
+                // Add to Platform Owner (Creator Coins) - Try to update if user exists
+                c.env.STEAMCANVAS_DB.prepare('UPDATE Users SET creator_balance = creator_balance + ? WHERE steam_id = ?').bind(platformFee, platformOwnerSteamId)
             ] : []),
 
-            // Record Transaction (Sale)
+            // Record Transaction (Sale) for Buyer
             c.env.STEAMCANVAS_DB.prepare(`
-                INSERT INTO Transactions (user_id, amount, type, status, created_at) 
-                VALUES (?, ?, 'PURCHASE', 'COMPLETED', CURRENT_TIMESTAMP)
-            `).bind(buyer.id, price),
+                INSERT INTO Transactions (user_id, amount, type, status, created_at, meta_data) 
+                VALUES (?, ?, 'PURCHASE', 'COMPLETED', CURRENT_TIMESTAMP, ?)
+            `).bind(buyer.id, price, JSON.stringify({ artworkId, artworkTitle: artwork.title })),
+
+            // Record Transaction (Earning) for Creator
+            c.env.STEAMCANVAS_DB.prepare(`
+                INSERT INTO Transactions (user_id, amount, type, status, created_at, meta_data) 
+                VALUES (?, ?, 'DEPOSIT', 'COMPLETED', CURRENT_TIMESTAMP, ?)
+            `).bind(creatorUid, creatorShare, JSON.stringify({ artworkId, artworkTitle: artwork.title, source: 'sale', currency: 'CC' })),
 
             // Record Ownership (Inventory)
             c.env.STEAMCANVAS_DB.prepare(`
@@ -1012,5 +1098,32 @@ app.get('/api/v1/admin/reports', authMiddleware, adminCheck, async (c) => {
     }
 });
 
+
+
+// Helper: Resolve Vanity URL
+app.get('/api/v1/steam/resolve/:vanityUrl', async (c) => {
+    const vanityUrl = c.req.param('vanityUrl');
+    const apiKey = c.env.STEAM_API_KEY;
+
+    if (!vanityUrl) {
+        return c.json({ error: 'Missing vanity URL' }, 400);
+    }
+
+    try {
+        const response = await fetch(
+            `https://api.steampowered.com/ISteamUser/ResolveVanityURL/v0001/?key=${apiKey}&vanityurl=${vanityUrl}`
+        );
+        const data: any = await response.json();
+
+        if (data.response && data.response.success === 1) {
+            return c.json({ steamid: data.response.steamid });
+        } else {
+            return c.json({ error: 'Could not resolve Steam ID', message: data.response.message }, 404);
+        }
+    } catch (error: any) {
+        console.error('Steam API Error:', error);
+        return c.json({ error: 'Failed to contact Steam API' }, 500);
+    }
+});
 
 export default app;

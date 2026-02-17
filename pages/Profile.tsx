@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { User, Artwork } from '../types';
 import {
   MapPin,
@@ -100,6 +101,54 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
   ]);
 
   const [sidebarSections, setSidebarSections] = useState<SidebarSection[]>([]);
+
+  // Bio State
+  const [bioHeadline, setBioHeadline] = useState(user.bio_headline || "Digital Artist & visual storyteller.");
+  const [bioContent, setBioContent] = useState(user.bio_content || "Welcome to my creative space. I specialize in...");
+  const [socialLinks, setSocialLinks] = useState(user.social_links ? JSON.parse(user.social_links) : { twitter: '', instagram: '', artstation: '' });
+  const [creatorTools, setCreatorTools] = useState(user.creator_tools || "Photoshop, Blender, After Effects");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    setBioHeadline(user.bio_headline || "Digital Artist & visual storyteller.");
+    setBioContent(user.bio_content || "Welcome to my creative space. I specialize in...");
+    setSocialLinks(user.social_links ? JSON.parse(user.social_links) : { twitter: '', instagram: '', artstation: '' });
+    setCreatorTools(user.creator_tools || "Photoshop, Blender, After Effects");
+  }, [user]);
+
+  const handleSaveProfile = async () => {
+    setIsSubmitting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/user/profile`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          bio_headline: bioHeadline,
+          bio_content: bioContent,
+          social_links: socialLinks,
+          creator_tools: creatorTools
+        })
+      });
+
+      if (res.ok) {
+        setIsEditMode(false);
+        // Optionally refresh user data here or show toast
+        alert("Profile updated successfully!");
+      } else {
+        const data = await res.json();
+        alert(`Failed to update: ${data.error}`);
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error updating profile");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const tabs = ['Home', 'Vault', 'Shop', 'Storage', 'About', 'Subscriptions', 'Stats'];
 
@@ -743,9 +792,164 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
               )}
             </div>
           )}
+
+          {/* ABOUT TAB */}
+          {activeTab === 'About' && (
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+              {/* Main Content: Bio */}
+              <div className="lg:col-span-8 space-y-12">
+                {/* Headline */}
+                <div className="space-y-4">
+                  {isEditMode ? (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Headline</label>
+                      <input
+                        type="text"
+                        value={bioHeadline}
+                        onChange={(e) => setBioHeadline(e.target.value)}
+                        className="w-full bg-[#0b0c0f] border border-white/10 rounded-xl p-4 text-2xl font-black text-white focus:outline-none focus:border-white/30 transition-colors"
+                        placeholder="Your catchy headline..."
+                      />
+                    </div>
+                  ) : (
+                    <h2 className="text-4xl md:text-5xl font-black text-white leading-tight tracking-tight">
+                      {bioHeadline}
+                    </h2>
+                  )}
+                  <div className="h-1 w-20 bg-steam-blue rounded-full" style={{ backgroundColor: accentColor }} />
+                </div>
+
+                {/* Bio Content */}
+                <div className="bg-[#0b0c0f]/50 backdrop-blur-sm border border-white/5 rounded-3xl p-8 md:p-12 relative overflow-hidden group">
+                  {/* Decoration */}
+                  <div className="absolute top-0 right-0 p-4 opacity-5">
+                    <FileText size={120} />
+                  </div>
+
+                  {isEditMode ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 h-full">
+                      <div className="space-y-2 h-full flex flex-col">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                          <Edit size={12} /> Markdown Editor
+                        </label>
+                        <textarea
+                          value={bioContent}
+                          onChange={(e) => setBioContent(e.target.value)}
+                          className="w-full flex-1 min-h-[400px] bg-black/40 border border-white/10 rounded-xl p-6 text-sm text-gray-300 font-mono focus:outline-none focus:border-white/30 transition-colors resize-none"
+                          placeholder="# About Me\n\nWrite your story here..."
+                        />
+                      </div>
+                      <div className="space-y-2 h-full flex flex-col">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                          <Zap size={12} /> Live Preview
+                        </label>
+                        <div className="w-full flex-1 min-h-[400px] bg-black/40 border border-white/10 rounded-xl p-6 overflow-y-auto prose prose-invert prose-sm max-w-none">
+                          <ReactMarkdown>{bioContent}</ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="prose prose-invert prose-lg max-w-none prose-headings:font-black prose-headings:uppercase prose-headings:tracking-tight prose-p:text-gray-400 prose-p:leading-relaxed prose-a:text-steam-blue hover:prose-a:text-white transition-colors">
+                      <ReactMarkdown>{bioContent}</ReactMarkdown>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Sidebar: Stats & Connect */}
+              <div className="lg:col-span-4 space-y-8">
+                {/* Tools of the Trade */}
+                <div className="bg-[#0b0c0f]/80 backdrop-blur-sm border border-white/5 rounded-2xl p-8 space-y-6">
+                  <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <Zap size={14} style={{ color: accentColor }} /> Tools of the Trade
+                  </h3>
+
+                  {isEditMode ? (
+                    <div className="space-y-2">
+                      <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Comma separated list</label>
+                      <input
+                        type="text"
+                        value={creatorTools}
+                        onChange={(e) => setCreatorTools(e.target.value)}
+                        className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-white/30"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {creatorTools.split(',').map((tool, i) => (
+                        <span key={i} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-[10px] font-bold text-gray-300 uppercase tracking-wider hover:bg-white/10 hover:border-white/20 transition-all cursor-default">
+                          {tool.trim()}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Social Connect */}
+                <div className="bg-[#0b0c0f]/80 backdrop-blur-sm border border-white/5 rounded-2xl p-8 space-y-6">
+                  <h3 className="text-xs font-black text-white uppercase tracking-widest flex items-center gap-2">
+                    <UserIcon size={14} style={{ color: accentColor }} /> Connect
+                  </h3>
+
+                  {isEditMode ? (
+                    <div className="space-y-4">
+                      <div className="space-y-1">
+                        <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Twitter</label>
+                        <input
+                          type="text"
+                          value={socialLinks.twitter}
+                          onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
+                          className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-2 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">ArtStation</label>
+                        <input
+                          type="text"
+                          value={socialLinks.artstation}
+                          onChange={(e) => setSocialLinks({ ...socialLinks, artstation: e.target.value })}
+                          className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-2 text-sm text-white"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[9px] text-gray-500 font-bold uppercase tracking-widest">Instagram</label>
+                        <input
+                          type="text"
+                          value={socialLinks.instagram}
+                          onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
+                          className="w-full bg-[#1a1a1a] border border-white/10 rounded-lg p-2 text-sm text-white"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {socialLinks.twitter && (
+                        <a href={socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors group">
+                          <span className="text-[10px] font-black text-gray-400 group-hover:text-white uppercase tracking-widest">Twitter</span>
+                          <ExternalLink size={14} className="text-gray-600 group-hover:text-white transition-colors" />
+                        </a>
+                      )}
+                      {socialLinks.artstation && (
+                        <a href={socialLinks.artstation} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors group">
+                          <span className="text-[10px] font-black text-gray-400 group-hover:text-white uppercase tracking-widest">ArtStation</span>
+                          <ExternalLink size={14} className="text-gray-600 group-hover:text-white transition-colors" />
+                        </a>
+                      )}
+                      {socialLinks.instagram && (
+                        <a href={socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors group">
+                          <span className="text-[10px] font-black text-gray-400 group-hover:text-white uppercase tracking-widest">Instagram</span>
+                          <ExternalLink size={14} className="text-gray-600 group-hover:text-white transition-colors" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          )}
+
         </div>
       </div>
-
       {/* FOOTER EDITOR BAR */}
       <AnimatePresence>
         {isEditMode && (
@@ -760,7 +964,17 @@ const Profile: React.FC<ProfileProps> = ({ user, artworks, onBuy, setPage }) => 
               <span className="text-[8px] text-gray-500 uppercase font-black tracking-widest mt-1">Live Profile Tuning</span>
             </div>
             <div className="flex items-center gap-5">
-              <button onClick={() => setIsEditMode(false)} className="px-8 py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full transition-all hover:scale-105 active:scale-95 shadow-xl">Save Changes</button>
+              <button
+                onClick={handleSaveProfile}
+                disabled={isSubmitting}
+                className="px-8 py-3 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full transition-all hover:scale-105 active:scale-95 shadow-xl disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin" /> Saving...
+                  </>
+                ) : "Save Changes"}
+              </button>
               <button onClick={() => setIsEditMode(false)} className="px-8 py-3 bg-white/5 text-white text-[10px] font-black uppercase tracking-widest rounded-full border border-white/10 hover:bg-white/10 transition-all">Discard</button>
             </div>
           </motion.div>

@@ -309,7 +309,17 @@ const CreatorDashboard: React.FC<CreatorDashboardProps> = ({ user, setPage }) =>
                     <div className="flex items-center gap-4">
                       <div className="w-16 h-12 rounded-lg bg-gray-800 overflow-hidden border border-white/10 shrink-0">
                         {art.preview_url?.endsWith('.webm') ? (
-                          <video src={art.preview_url} className="w-full h-full object-cover" muted loop autoPlay />
+                          <video
+                            src={art.preview_url}
+                            className="w-full h-full object-cover"
+                            muted
+                            playsInline
+                            onMouseEnter={(e) => e.currentTarget.play()}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.pause();
+                              e.currentTarget.currentTime = 0;
+                            }}
+                          />
                         ) : (
                           <img src={art.preview_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt="Art" />
                         )}

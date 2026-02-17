@@ -1,6 +1,6 @@
 import React from 'react';
 import { User } from '../types';
-import { Wallet, Menu, X, ShoppingBag, Bell, Plus, Star, Wrench, Compass, ShieldAlert } from 'lucide-react';
+import { Wallet, Menu, X, ShoppingBag, Bell, Plus, Star, Wrench, Compass, ShieldAlert, User as UserIcon, Layout, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface NavbarProps {
@@ -8,10 +8,26 @@ interface NavbarProps {
   currentPage: string;
   setPage: (page: string) => void;
   onLogin: () => void;
+  onLogout?: () => void;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) => {
+const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin, onLogout }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-md bg-black/40 border-b border-white/5 transition-all duration-300">
@@ -96,12 +112,77 @@ const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) 
                     <Wallet className="w-5 h-5 text-gray-400 ml-1 group-hover:text-white" />
                   </div>
 
-                  {/* Avatar */}
-                  <div
-                    onClick={() => setPage('profile')}
-                    className="w-8 h-8 rounded-full overflow-hidden border border-white/20 cursor-pointer hover:border-steam-blue transition-colors shrink-0"
-                  >
-                    <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
+                  {/* User Dropdown Trigger */}
+                  <div className="relative" ref={dropdownRef}>
+                    <div
+                      onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                      className="flex items-center gap-3 cursor-pointer group"
+                    >
+                      <div className="text-right hidden xl:block">
+                        <div className="text-sm font-bold text-white group-hover:text-steam-blue transition-colors truncate max-w-[120px]">
+                          {user.username}
+                        </div>
+                        <div className="text-[10px] text-gray-500 uppercase tracking-widest group-hover:text-gray-400 transition-colors">
+                          {user.status || 'Member'}
+                        </div>
+                      </div>
+
+                      <div className="w-9 h-9 rounded-full overflow-hidden border border-white/20 group-hover:border-steam-blue transition-all shadow-lg shadow-black/50 shrink-0">
+                        <img src={user.avatarUrl} alt="User" className="w-full h-full object-cover" />
+                      </div>
+
+                      <ChevronDown size={14} className={`text-gray-400 transition-transform duration-300 ${isUserMenuOpen ? 'rotate-180' : ''}`} />
+                    </div>
+
+                    {/* Dropdown Menu */}
+                    <AnimatePresence>
+                      {isUserMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          transition={{ duration: 0.2 }}
+                          className="absolute right-0 top-full mt-4 w-56 rounded-xl bg-black/80 backdrop-blur-md border border-white/10 shadow-2xl shadow-steam-blue/5 overflow-hidden ring-1 ring-white/5"
+                        >
+                          <div className="py-2">
+                            <button
+                              onClick={() => { setPage('profile'); setIsUserMenuOpen(false); }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 flex items-center gap-3 transition-colors"
+                            >
+                              <UserIcon size={16} />
+                              My Profile
+                            </button>
+                            <button
+                              onClick={() => { setPage('dashboard'); setIsUserMenuOpen(false); }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 flex items-center gap-3 transition-colors"
+                            >
+                              <Layout size={16} />
+                              Creator Studio
+                            </button>
+                            <button
+                              onClick={() => { setPage('settings'); setIsUserMenuOpen(false); }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-white/5 flex items-center gap-3 transition-colors"
+                            >
+                              <Settings size={16} />
+                              Settings
+                            </button>
+
+                            <div className="h-px bg-white/10 my-2 mx-4"></div>
+
+                            <button
+                              onClick={() => {
+                                if (onLogout) onLogout();
+                                setIsUserMenuOpen(false);
+                              }}
+                              className="w-full text-left px-4 py-2.5 text-sm text-red-400/80 hover:text-red-400 hover:bg-red-500/10 flex items-center gap-3 transition-all"
+                            >
+                              <LogOut size={16} />
+                              Log Out
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
 
@@ -151,12 +232,17 @@ const Navbar: React.FC<NavbarProps> = ({ user, currentPage, setPage, onLogin }) 
               <button onClick={() => { setPage('upload'); setIsMenuOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-white/10 w-full text-left">Upload Design</button>
               <button onClick={() => { setPage('profile'); setIsMenuOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-white/10 w-full text-left">My Profile</button>
 
+              {/* Settings and Logout for Mobile */}
+              <button onClick={() => { setPage('settings'); setIsMenuOpen(false); }} className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-white/10 w-full text-left">Settings</button>
+
               {/* ADMIN SHORTCUT */}
               <button onClick={() => { setPage('moha31h'); setIsMenuOpen(false); }} className="flex items-center gap-2 px-3 py-2 rounded-md text-base font-black text-red-500 hover:bg-red-500/10 w-full text-left">
                 <ShieldAlert size={18} /> Admin Console
               </button>
 
-              {!user && (
+              {user ? (
+                <button onClick={() => { if (onLogout) onLogout(); setIsMenuOpen(false); }} className="block w-full mt-4 bg-red-500/10 text-red-400 font-bold py-2 rounded text-center border border-red-500/20">Log Out</button>
+              ) : (
                 <button onClick={onLogin} className="block w-full mt-4 bg-steam-blue text-steam-dark font-bold py-2 rounded text-center">Login With Steam</button>
               )}
             </div>

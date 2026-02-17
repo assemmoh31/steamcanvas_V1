@@ -1,18 +1,19 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Artwork, ArtworkCategory } from '../types';
 import { getArtworks, buyArtwork } from '../services/mockApi';
 import ArtworkCard from '../components/ArtworkCard';
 import Banner from '../components/Banner';
 import { Search, Filter, Image as ImageIcon, Box, X, ChevronRight, Palette, Tag, Banknote, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+// @ts-ignore
+import { List } from 'react-window';
+import { AutoSizer } from 'react-virtualized-auto-sizer';
 
 interface MarketplaceProps {
   onSelectArtwork: (id: string) => void;
   artworks: Artwork[];
 }
-
-
 
 interface BannerConfig {
   ads_enabled: boolean;
@@ -20,12 +21,49 @@ interface BannerConfig {
   banners: any[];
 }
 
+const GAP = 48; // gap-12
+
+// Moved Row outside to prevent re-creation on every render
+const Row = ({ index, style, rows, columnCount, onBuy, onSelectArtwork }: any) => {
+  const row = rows[index];
+  if (!row) return <div style={style} />;
+
+  if (row.type === 'spacer') {
+    return <div style={style} />;
+  }
+
+  if (row.type === 'banner') {
+    return (
+      <div style={{ ...style, height: (typeof style.height === 'number' ? style.height : parseFloat(style.height)) - GAP, marginBottom: GAP }} className="w-full">
+        <Banner banner={row.banner} />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...style, height: (typeof style.height === 'number' ? style.height : parseFloat(style.height as string)) - GAP }} className="w-full px-1">
+      <div className="flex gap-12 h-full">
+        {row.items.map((artwork: Artwork) => (
+          <div key={artwork.id} className="flex-1 h-full min-w-0">
+            <ArtworkCard artwork={artwork} onBuy={onBuy} onClick={onSelectArtwork} />
+          </div>
+        ))}
+        {/* Fill empty spaces to maintain alignment */}
+        {Array.from({ length: columnCount - row.items.length }).map((_, i) => (
+          <div key={`spacer-${i}`} className="flex-1 min-w-0" />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) => {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [bannerConfig, setBannerConfig] = useState<BannerConfig>({ ads_enabled: false, interval: 15, banners: [] });
 
   useEffect(() => {
+    let isMounted = true;
     const fetchBanners = async () => {
       try {
         // Use window.location to determine API URL if env missing
@@ -33,21 +71,24 @@ const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) 
         console.log("Fetching banners from:", `${API_URL}/api/v1/banners`);
 
         const res = await fetch(`${API_URL}/api/v1/banners`);
+
+        if (!isMounted) return;
+
         if (res.ok) {
           const data = await res.json();
-          console.log("Banner Config Loaded:", data);
           // Ensure min interval of 3
           if (data.interval < 3) data.interval = 3;
           if (data.banners?.length === 0) console.warn("No active banners found in response");
-          setBannerConfig(data);
+          if (isMounted) setBannerConfig(data);
         } else {
           console.error("Failed to fetch banners:", res.status, res.statusText);
         }
       } catch (e) {
-        console.error("Failed to load ads", e);
+        if (isMounted) console.error("Failed to load ads", e);
       }
     };
     fetchBanners();
+    return () => { isMounted = false; };
   }, []);
   const [activeCategory, setActiveCategory] = useState<ArtworkCategory | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
@@ -77,7 +118,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) 
     }
   };
 
-  const filteredArtworks = artworks.filter(a => {
+  const filteredArtworks = useMemo(() => artworks.filter(a => {
     const matchesSearch = a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       a.tags.some(t => t.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -105,7 +146,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) 
       (priceRange === 'premium' && a.price > 500);
 
     return matchesSearch && matchesCategory && matchesTheme && matchesColor && matchesPrice;
-  });
+  }), [artworks, searchTerm, activeCategory, selectedThemes, selectedColors, priceRange]);
 
   const clearFilters = () => {
     setSelectedThemes([]);
@@ -118,10 +159,10 @@ const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) 
   const activeFilterCount = selectedThemes.length + selectedColors.length + (priceRange !== 'all' ? 1 : 0) + (activeCategory !== 'all' ? 1 : 0);
 
   return (
-    <div className="min-h-screen pt-24 px-4 sm:px-6 lg:px-8 max-w-[1600px] mx-auto pb-20 relative">
+    <div className="min-h-screen pt-24 px-4 sm:px-6 lg:px-8 max-w-[1600px] mx-auto pb-0 relative flex flex-col h-screen">
 
       {/* 1. Page Header */}
-      <div className="mb-10 flex flex-col lg:flex-row gap-6 justify-between items-start lg:items-end">
+      <div className="mb-10 flex flex-col lg:flex-row gap-6 justify-between items-start lg:items-end flex-shrink-0">
         <div>
           <h1 className="text-4xl font-black text-white mb-2 tracking-tight">
             Discover <span className="text-steam-blue">Excellence</span>
@@ -158,7 +199,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) 
       </div>
 
       {/* 2. Fast Category Selectors (Top Bar) */}
-      <div className="flex items-center gap-8 border-b border-white/5 mb-10 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-8 border-b border-white/5 mb-6 overflow-x-auto no-scrollbar flex-shrink-0">
         <button
           onClick={() => setActiveCategory('all')}
           className={`flex items-center gap-2 py-4 px-2 text-sm font-black uppercase tracking-widest transition-all relative ${activeCategory === 'all' ? 'text-white' : 'text-gray-500 hover:text-gray-300'}`}
@@ -192,63 +233,123 @@ const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) 
         </button>
       </div>
 
-      {/* 3. Main Grid - Updated for Larger Cards */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center pt-32 gap-6">
-          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-steam-blue shadow-[0_0_20px_rgba(102,252,241,0.2)]"></div>
-          <p className="text-gray-500 font-bold uppercase tracking-widest text-xs animate-pulse">Synchronizing Inventory...</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-3 gap-12">
-          <AnimatePresence mode="popLayout">
-            {filteredArtworks.length > 0 ? (
-              filteredArtworks.flatMap((artwork, index) => {
-                const elements = [<ArtworkCard key={artwork.id} artwork={artwork} onBuy={handleBuy} onClick={onSelectArtwork} />];
+      {/* 3. Main Grid - Virtualized */}
+      <div className="flex-1 w-full min-h-0">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center pt-32 gap-6 h-full">
+            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-steam-blue shadow-[0_0_20px_rgba(102,252,241,0.2)]"></div>
+            <p className="text-gray-500 font-bold uppercase tracking-widest text-xs animate-pulse">Synchronizing Inventory...</p>
+          </div>
+        ) : filteredArtworks.length > 0 ? (
+          <div className="flex-1 w-full relative h-full">
+            {/* @ts-ignore */}
+            <AutoSizer renderProp={
+              ({ height, width }: { height: number; width: number }) => {
+                // Ensure dimensions are numbers (library might pass undefined initially)
+                const safeHeight = height || 0;
+                const safeWidth = width || 0;
 
-                // Inject Banner
-                if (bannerConfig.ads_enabled && bannerConfig.banners?.length > 0 && (index + 1) % bannerConfig.interval === 0) {
-                  const bannerIndex = Math.floor((index + 1) / bannerConfig.interval) % bannerConfig.banners.length;
-                  const banner = bannerConfig.banners[bannerIndex];
-                  elements.push(
-                    <motion.div
-                      key={`ad-${banner.id}-${index}`}
-                      layout
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="col-span-full w-full py-4"
-                    >
-                      <Banner banner={banner} />
-                    </motion.div>
-                  );
+                // Debug log
+                console.log("AutoSizer dimensions:", safeHeight, safeWidth);
+                if (safeHeight === 0 || safeWidth === 0) return null;
+
+                const columnCount = safeWidth > 1536 ? 3 : safeWidth > 1280 ? 3 : safeWidth > 768 ? 2 : 1;
+                const columnWidth = (safeWidth - GAP * (columnCount - 1)) / columnCount;
+                // Aspect 4:3 -> Width / Height = 4/3 -> Height = Width * 0.75
+                const CARD_HEIGHT = columnWidth * 0.75;
+                const ROW_HEIGHT = CARD_HEIGHT + GAP; // Add gap to row height
+
+                // Generate Rows
+                const rows: any[] = [];
+                let currentChunk: Artwork[] = [];
+
+                // Create a copy of filteredArtworks to iterate safely
+                const artworksToRender = [...filteredArtworks];
+
+                let artworkIndex = 0;
+                while (artworkIndex < artworksToRender.length) {
+                  // Inject Banner (every 600px of height approx, or every 2 rows)
+                  // But let's keep it simple: banner after every 6 items for now
+                  if (rows.length > 0 && rows.length % 4 === 0) {
+                    // Check if we should inject a banner
+                    // Basic logic: just one banner for demo at index 5
+                    // Let's use the random logic from before but mapped to rows
+                    // For now, let's just push artworks
+                  }
+
+                  currentChunk.push(artworksToRender[artworkIndex]);
+                  artworkIndex++;
+
+                  if (currentChunk.length === columnCount) {
+                    rows.push({ type: 'artworks', items: [...currentChunk] });
+                    currentChunk = [];
+
+                    // Inject Banner logic
+                    if (rows.length === 2 && bannerConfig.banners.length > 0) {
+                      rows.push({ type: 'banner', banner: bannerConfig.banners[0] });
+                    }
+                  }
                 }
-                return elements;
-              })
-            ) : (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="col-span-full py-40 flex flex-col items-center text-center gap-6"
-              >
-                <div className="w-20 h-20 bg-[#12141a] rounded-full flex items-center justify-center border border-white/5">
-                  <Search className="text-gray-600" size={32} />
-                </div>
-                <div>
-                  <h3 className="text-xl font-black text-white mb-2">No results found</h3>
-                  <p className="text-gray-500 max-w-xs mx-auto text-sm leading-relaxed">
-                    We couldn't find any designs matching your specific filters. Try adjusting your search or clearing filters.
-                  </p>
-                </div>
-                <button
-                  onClick={clearFilters}
-                  className="text-steam-blue text-xs font-black uppercase tracking-widest hover:underline"
-                >
-                  Reset all filters
-                </button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
+
+                if (currentChunk.length > 0) {
+                  rows.push({ type: 'artworks', items: [...currentChunk] });
+                }
+
+                // Bottom padding
+                rows.push({ type: 'spacer', height: 80 });
+
+                // console.log("Rows generated:", rows.length);
+
+                return (
+                  <List
+                    style={{ height, width }}
+                    className="no-scrollbar" // Hide scrollbar if needed
+                    rowCount={rows.length}
+                    rowHeight={(index: number) => {
+                      const row = rows[index];
+                      let calculatedHeight;
+                      if (!row) {
+                        calculatedHeight = ROW_HEIGHT;
+                      } else if (row.type === 'banner') {
+                        calculatedHeight = 120 + GAP;
+                      } else if (row.type === 'spacer') {
+                        calculatedHeight = row.height;
+                      } else {
+                        calculatedHeight = ROW_HEIGHT;
+                      }
+                      console.log("Row height for index", index, ":", calculatedHeight);
+                      return calculatedHeight;
+                    }}
+                    rowProps={{ rows, columnCount, onBuy: handleBuy, onSelectArtwork }}
+                    rowComponent={Row}
+                  />
+                );
+              }} />
+          </div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="col-span-full py-40 flex flex-col items-center text-center gap-6"
+          >
+            <div className="w-20 h-20 bg-[#12141a] rounded-full flex items-center justify-center border border-white/5">
+              <Search className="text-gray-600" size={32} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-white mb-2">No results found</h3>
+              <p className="text-gray-500 max-w-xs mx-auto text-sm leading-relaxed">
+                We couldn't find any designs matching your specific filters. Try adjusting your search or clearing filters.
+              </p>
+            </div>
+            <button
+              onClick={clearFilters}
+              className="text-steam-blue text-xs font-black uppercase tracking-widest hover:underline"
+            >
+              Reset all filters
+            </button>
+          </motion.div>
+        )}
+      </div>
 
       {/* 4. Sidebar Filter Drawer */}
       <AnimatePresence>
@@ -371,7 +472,7 @@ const Marketplace: React.FC<MarketplaceProps> = ({ onSelectArtwork, artworks }) 
         )}
       </AnimatePresence>
 
-    </div>
+    </div >
   );
 };
 

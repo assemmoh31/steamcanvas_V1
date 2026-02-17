@@ -1,9 +1,10 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Artwork } from '../types';
 import { Heart, Check, PlayCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CreatorTag from './CreatorTag';
+import { getOptimizedImageUrl } from '../utils/image';
 
 interface ArtworkCardProps {
   artwork: Artwork;
@@ -14,14 +15,18 @@ interface ArtworkCardProps {
 const ArtworkCard: React.FC<ArtworkCardProps> = ({ artwork, onBuy, onClick }) => {
   const [liked, setLiked] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const videoRef = React.useRef<HTMLVideoElement>(null);
+  const [showVideo, setShowVideo] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Use the first color as dominant, fallback to steam blue if not present
   const dominantColor = artwork.colors?.[0] || '#66c0f4';
 
-  React.useEffect(() => {
-    if (videoRef.current) {
-      if (isHovered) {
+  const isVideo = artwork.imageUrl?.endsWith('.webm') || artwork.imageUrl?.endsWith('.mp4');
+
+  useEffect(() => {
+    if (isVideo && videoRef.current) {
+      if (showVideo) {
         const playPromise = videoRef.current.play();
         if (playPromise !== undefined) {
           playPromise.catch(() => { });
@@ -31,7 +36,34 @@ const ArtworkCard: React.FC<ArtworkCardProps> = ({ artwork, onBuy, onClick }) =>
         videoRef.current.currentTime = 0;
       }
     }
-  }, [isHovered]);
+  }, [showVideo, isVideo]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    // Schedule video play
+    if (isVideo) {
+      hoverTimeoutRef.current = setTimeout(() => {
+        setShowVideo(true);
+      }, 300);
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    setShowVideo(false);
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+  };
 
   return (
     <motion.div
@@ -40,8 +72,8 @@ const ArtworkCard: React.FC<ArtworkCardProps> = ({ artwork, onBuy, onClick }) =>
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
       className="group relative h-full rounded-2xl"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div
         onClick={() => onClick(artwork.id)}
@@ -54,26 +86,28 @@ const ArtworkCard: React.FC<ArtworkCardProps> = ({ artwork, onBuy, onClick }) =>
 
         {/* Image/Video Container */}
         <div className="relative w-full aspect-[4/3] bg-black">
-          {artwork.imageUrl?.endsWith('.webm') ? (
+          {isVideo ? (
             <video
               ref={videoRef}
               src={artwork.imageUrl}
               loop
               muted
               playsInline
-              className="absolute inset-0 w-full h-full object-cover opacity-90 transition-opacity duration-500 group-hover:opacity-100"
+              // Show first frame by default, play on hover (via effect)
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${showVideo ? 'opacity-100' : 'opacity-90'}`}
             />
           ) : (
             <img
-              src={artwork.imageUrl}
+              src={getOptimizedImageUrl(artwork.imageUrl, { width: 400, format: 'avif', fit: 'cover' })}
               alt={artwork.title}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105 opacity-90 group-hover:opacity-100"
+              loading="lazy"
             />
           )}
 
           {/* Top-Left Badges - Always Visible */}
           <div className="absolute top-3 left-3 flex flex-col gap-2 z-20">
-            {(artwork.category === 'workshop' || artwork.imageUrl?.endsWith('.webm')) && (
+            {(artwork.category === 'workshop' || isVideo) && (
               <div className="px-2.5 py-1 rounded-md bg-black/60 backdrop-blur-md border border-white/10 flex items-center gap-1.5 transition-all duration-300 group-hover:-translate-y-1">
                 <PlayCircle size={12} className="text-white" />
                 <span className="text-[10px] font-black text-white uppercase tracking-widest">Animated</span>
@@ -115,8 +149,6 @@ const ArtworkCard: React.FC<ArtworkCardProps> = ({ artwork, onBuy, onClick }) =>
                 </span>
               </div>
             </div>
-
-
           </div>
         </div>
 
